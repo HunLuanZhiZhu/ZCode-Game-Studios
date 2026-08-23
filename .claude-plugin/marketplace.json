@@ -1,0 +1,13 @@
+{
+  "name": "zcode-game-studios",
+  "owner": {
+    "name": "ZCode-Game-Studios"
+  },
+  "plugins": [
+    {
+      "name": "ccgs-studio-hooks",
+      "description": "Game studio automation hooks (session context, commit validation, asset checks, audit trail)",
+      "source": "./ccgs-studio-hooks"
+    }
+  ]
+}

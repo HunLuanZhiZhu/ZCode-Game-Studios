@@ -1,0 +1,6 @@
+{
+  "name": "ccgs-studio-hooks",
+  "version": "0.1.0",
+  "description": "Claude Code Game Studios — session orientation, commit/push validation, asset checks, agent audit trail and notifications as ZCode/Claude Code plugin hooks.",
+  "author": "Donchitos (CCGS), adapted for ZCode"
+}

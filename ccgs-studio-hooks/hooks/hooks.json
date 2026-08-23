@@ -1,0 +1,165 @@
+{
+  "description": "Claude Code Game Studios — automated safety and orientation hooks. Fires only inside a CCGS project workspace (marker: .zcode/docs/technical-preferences.md).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-context.sh",
+              "session-start.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 10000
+          },
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-context.sh",
+              "detect-gaps.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-context.sh",
+              "post-compact.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 10000
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-guard.sh",
+              "validate-commit.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 15000
+          },
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-guard.sh",
+              "validate-push.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-guard.sh",
+              "log-agent.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-guard.sh",
+              "validate-assets.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 10000
+          },
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-guard.sh",
+              "validate-skill-change.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-guard.sh",
+              "log-agent-stop.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-guard.sh",
+              "notify.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 10000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/ccgs-guard.sh",
+              "session-stop.sh"
+            ],
+            "enabled": true,
+            "timeoutMs": 10000
+          }
+        ]
+      }
+    ]
+  }
+}
