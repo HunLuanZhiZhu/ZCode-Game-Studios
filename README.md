@@ -3,14 +3,14 @@
   <p align="center">
     Turn a single Claude Code session into a full game development studio.
     <br />
-    49 agents. 73 skills. One coordinated AI team.
+    49 agents. 74 skills. One coordinated AI team.
   </p>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
   <a href=".zcode/agents"><img src="https://img.shields.io/badge/agents-49-blueviolet" alt="49 Agents"></a>
-  <a href=".zcode/skills"><img src="https://img.shields.io/badge/skills-73-green" alt="73 Skills"></a>
+  <a href=".zcode/skills"><img src="https://img.shields.io/badge/skills-74-green" alt="74 Skills"></a>
   <a href="ccgs-studio-hooks/hooks"><img src="https://img.shields.io/badge/hooks-12-orange" alt="12 Hooks"></a>
   <a href=".zcode/rules"><img src="https://img.shields.io/badge/rules-11-red" alt="11 Rules"></a>
   <a href="https://docs.anthropic.com/en/docs/claude-code"><img src="https://img.shields.io/badge/built%20for-Claude%20Code-f5f5f5?logo=anthropic" alt="Built for Claude Code"></a>
@@ -53,7 +53,7 @@ The result: you still make every decision, but now you have a team that asks the
 | Category | Count | Description |
 |----------|-------|-------------|
 | **Agents** | 49 | Specialized subagents across design, programming, art, audio, narrative, QA, and production |
-| **Skills** | 73 | Slash commands for every workflow phase (`/start`, `/design-system`, `/create-epics`, `/create-stories`, `/dev-story`, `/story-done`, etc.) |
+| **Skills** | 74 | Slash commands for every workflow phase (`/start`, `/design-system`, `/create-epics`, `/create-stories`, `/dev-story`, `/story-done`, etc.), including `/auto-game-in-sleep` for fully hands-off overnight runs |
 | **Hooks** | 12 | Automated validation on commits, pushes, asset changes, session lifecycle, agent audit trail, and gap detection |
 | **Rules** | 11 | Path-scoped coding standards enforced when editing gameplay, engine, AI, UI, network code, and more |
 | **Templates** | 41 | Document templates for GDDs, UX specs, ADRs, sprint plans, HUD design, accessibility, and more |
@@ -94,7 +94,10 @@ The template includes agent sets for all three major engines. Use the set that m
 
 ## Slash Commands
 
-Type `/` in Claude Code to access all 73 skills:
+Type `/` in Claude Code to access all 74 skills:
+
+**Full Autonomy**
+`/auto-game-in-sleep` — one command runs the entire studio overnight: every workflow from concept to polish, decisions made on your behalf (logged), the game built, played in a browser, and iterated until done. See [Overnight Autopilot](#overnight-autopilot-auto-game-in-sleep).
 
 **Onboarding & Navigation**
 `/start` `/help` `/project-stage-detect` `/setup-engine` `/adopt`
@@ -160,7 +163,7 @@ All hooks fail gracefully if optional tools are missing — nothing breaks, you 
    - `/setup-engine godot 4.6` — configure your engine if you already know
    - `/project-stage-detect` — analyze an existing project
 
-That's it — `AGENTS.md`, the 73 skills in `.zcode/skills/`, and the path-scoped
+That's it — `AGENTS.md`, the 74 skills in `.zcode/skills/`, and the path-scoped
 rules are discovered automatically. You can start building your game right now.
 
 ### Optional: Install the Studio Hooks Plugin
@@ -203,7 +206,7 @@ ccgs-studio-hooks/                  # Optional automation plugin (see Getting St
 .zcode/
   settings.json                     # Legacy permission reference (from the Claude Code original)
   agents/                           # 49 agent definitions (markdown + YAML frontmatter)
-  skills/                           # 73 slash commands (subdirectory per skill)
+  skills/                           # 74 slash commands (subdirectory per skill)
   rules/                            # 11 path-scoped coding standards
   statusline.sh                     # Status line script (context%, model, stage, epic breadcrumb)
   docs/
@@ -233,7 +236,7 @@ Agents follow a structured delegation model:
 
 ### Collaborative, Not Autonomous
 
-This is **not** an auto-pilot system. Every agent follows a strict collaboration protocol:
+By default this is **not** an auto-pilot system. Every agent follows a strict collaboration protocol:
 
 1. **Ask** — agents ask questions before proposing solutions
 2. **Present options** — agents show 2-4 options with pros/cons
@@ -242,6 +245,41 @@ This is **not** an auto-pilot system. Every agent follows a strict collaboration
 5. **Approve** — nothing gets written without your sign-off
 
 You stay in control. The agents provide structure and expertise, not autonomy.
+
+### Overnight Autopilot (auto-game-in-sleep)
+
+When you **explicitly** run `/auto-game-in-sleep [max-hours]`, the studio
+switches to autonomous mode for that run:
+
+- **The full pipeline chains itself** — concept → systems design → architecture →
+  pre-production → sprints → polish → release, with no pausing between workflows.
+- **Decisions are made on your behalf** — every question the workflows would
+  have asked you is answered from your concept docs (or, failing that, by
+  studio best practice) and recorded in
+  `production/auto-game-in-sleep/decisions.md` with an "override" note, so you
+  can audit and reverse anything in the morning.
+- **The game builds the full scope, not a demo** — the target is the complete
+  tier from the game concept; a minimal version is a milestone on the way, never
+  the destination.
+- **It plays its own game** — web builds are served locally and driven with
+  browser automation (e.g. `agent-browser`): boot, core loop, menus, game over,
+  console errors, screenshots — feeding real bugs back into the sprint loop.
+- **It iterates until good** — playtest → top improvements → re-test, until all
+  GDD acceptance criteria pass, smoke check passes, and 3 playtest reports exist
+  (or the time budget runs out). Quality verdicts come from independent
+  reviewer subagents, never from the agent that wrote the code, and repeated
+  stalled iterations force a change of approach instead of more parameter tweaking.
+- **Done is not accepted** — every pipeline step records `done` (executor
+  finished) separately from `accepted` (gate passed, evidence on file), so an
+  interrupted run resumes by re-verifying rather than trusting.
+- **You get a morning report** — `production/auto-game-in-sleep/morning-report.md`:
+  what was built, how to run it, which quality bars passed or missed at cutoff,
+  every decision made, open issues, and what to do next.
+
+Safety rails still apply: no `git push`, no deletions of your content, guard
+hooks stay active, and the run resumes cleanly if interrupted
+(`production/auto-game-in-sleep/state.json` records a `last_seen` heartbeat at
+every step).
 
 ### Automated Safety
 
