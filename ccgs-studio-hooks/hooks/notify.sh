@@ -5,6 +5,17 @@
 # Read notification JSON from stdin
 INPUT=$(cat)
 
+# Dedupe — hosts may fire PermissionRequest and Notification for the same
+# prompt within seconds; skip if we already sent a toast recently.
+STAMP="production/session-logs/.last-notify"
+NOW=$(date +%s)
+if [ -f "$STAMP" ]; then
+    LAST=$(cat "$STAMP" 2>/dev/null || echo 0)
+    [ $((NOW - LAST)) -lt 10 ] && exit 0
+fi
+mkdir -p "$(dirname "$STAMP")" 2>/dev/null
+echo "$NOW" > "$STAMP" 2>/dev/null
+
 # Extract message — try jq first, fall back to grep
 if command -v jq &>/dev/null; then
   MESSAGE=$(echo "$INPUT" | jq -r '.message // empty' 2>/dev/null)
@@ -24,7 +35,7 @@ powershell.exe -NonInteractive -WindowStyle Hidden -Command "
   Add-Type -AssemblyName System.Windows.Forms
   \$notify = New-Object System.Windows.Forms.NotifyIcon
   \$notify.Icon = [System.Drawing.SystemIcons]::Information
-  \$notify.BalloonTipTitle = 'Claude Code'
+  \$notify.BalloonTipTitle = 'ZCode'
   \$notify.BalloonTipText = '$MESSAGE_SAFE'
   \$notify.Visible = \$true
   \$notify.ShowBalloonTip(5000)

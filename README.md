@@ -198,7 +198,7 @@ AGENTS.md                           # Master configuration
   marketplace.json                  # Plugin marketplace manifest (repo root = local marketplace)
 ccgs-studio-hooks/                  # Optional automation plugin (see Getting Started)
   .claude-plugin/plugin.json        # Plugin manifest
-  hooks/hooks.json                  # Hook event wiring (9 hooks across 6 events)
+  hooks/hooks.json                  # Hook event wiring — 12 hooks across 7 events, pure Claude Code spec
   hooks/*.sh                        # Guarded hook scripts (bash, cross-platform)
 .zcode/
   settings.json                     # Legacy permission reference (from the Claude Code original)
@@ -246,19 +246,23 @@ You stay in control. The agents provide structure and expertise, not autonomy.
 ### Automated Safety
 
 **Hooks** ship as the optional [`ccgs-studio-hooks`](#optional-install-the-studio-hooks-plugin)
-plugin (see Getting Started for installation):
+plugin (see Getting Started for installation). Declared in full Claude Code
+plugin spec — hosts run what they support: ZCode runs 10 hooks across 5 events
+(and ignores `PreCompact`/`Notification` entries), Claude Code runs all 12:
 
 | Hook | Trigger | What It Does |
 |------|---------|--------------|
+| `validate-dangerous.sh` | PreToolUse (Bash\|Read) | Restores the original deny rules — blocks `rm -rf`, `git push --force`, `git reset --hard`, `git clean -f`, `sudo`, `chmod 777` and `.env` file access with a rejection reason |
 | `validate-commit.sh` | PreToolUse (Bash) | Checks for hardcoded values, TODO format, JSON validity, design doc sections — exits early if the command is not `git commit` |
 | `validate-push.sh` | PreToolUse (Bash) | Warns on pushes to protected branches — exits early if the command is not `git push` |
 | `validate-assets.sh` | PostToolUse (Write/Edit) | Validates naming conventions and JSON structure — exits early if the file is not in `assets/` |
 | `session-start.sh` | Session open | Shows current branch and recent commits for orientation |
 | `detect-gaps.sh` | Session open | Detects fresh projects (suggests `/start`) and missing design docs when code or prototypes exist |
+| `pre-compact.sh` | Before compaction | Preserves session progress notes into the conversation (Claude Code only — ZCode has no pre-compaction event) |
 | `post-compact.sh` | Session restarts after context compaction | Reminds the model to restore session state from `active.md` |
-| `notify.sh` | Permission request | Shows Windows toast notification via PowerShell |
+| `notify.sh` | PermissionRequest / Notification | Shows Windows toast notification via PowerShell (deduplicated within 10 s) |
 | `session-stop.sh` | Turn ends | Archives `active.md` to session log and records git activity |
-| `log-agent.sh` | Agent spawned | Audit trail start — logs subagent invocation |
+| `log-agent.sh` | Agent spawned | Audit trail start — logs subagent invocation and type |
 | `log-agent-stop.sh` | Agent stops | Audit trail stop — completes subagent record |
 | `validate-skill-change.sh` | PostToolUse (Write/Edit) | Advises running `/skill-test` after any `.zcode/skills/` change |
 

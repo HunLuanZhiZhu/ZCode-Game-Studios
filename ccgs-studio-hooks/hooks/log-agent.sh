@@ -11,11 +11,13 @@
 
 INPUT=$(cat)
 
-# Parse agent name -- use jq if available, fall back to grep
+# Parse agent name -- use jq if available, fall back to grep.
+# CC SubagentStart puts agent_type at top level; ZCode's PreToolUse(Agent)
+# carries it inside tool_input.subagent_type. Accept both.
 if command -v jq >/dev/null 2>&1; then
-    AGENT_NAME=$(echo "$INPUT" | jq -r '.agent_type // "unknown"' 2>/dev/null)
+    AGENT_NAME=$(echo "$INPUT" | jq -r '.tool_input.subagent_type // .agent_type // "unknown"' 2>/dev/null)
 else
-    AGENT_NAME=$(echo "$INPUT" | grep -oE '"agent_type"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/"agent_type"[[:space:]]*:[[:space:]]*"//;s/"$//')
+    AGENT_NAME=$(echo "$INPUT" | grep -oE '"(subagent_type|agent_type)"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/"[a-z_]*"[[:space:]]*:[[:space:]]*"//;s/"$//')
     [ -z "$AGENT_NAME" ] && AGENT_NAME="unknown"
 fi
 

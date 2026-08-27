@@ -1,6 +1,6 @@
 # Active Hooks
 
-Hooks are configured in `.zcode/settings.json` and fire automatically:
+Hooks are registered by the optional `ccgs-studio-hooks` plugin in `ccgs-studio-hooks/hooks/hooks.json` and fire when that plugin is installed and enabled. `.zcode/settings.json` is retained only as a legacy status-line/permission reference and does not register hooks.
 
 | Hook | Event | Trigger | Action |
 | ---- | ----- | ------- | ------ |
