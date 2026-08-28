@@ -52,8 +52,11 @@ Override via arguments: `/auto-game-in-sleep — review: solo — testing: headl
   is written in: GDDs, art bible, ADRs, architecture, UX specs, review and
   playtest reports, the decision log, and the return report. This is the
   language *you* read, and it is independent of the game's own language.
-- **ENGINE = Godot** — the engine to configure when the project has none set.
-  Passed to `/setup-engine`. If an engine is already configured in
+- **ENGINE = Godot** (default location: the project root directory; if Godot
+  is not present there, download it to that path) — the engine to configure
+  when the project has none set. This location note applies only to the Godot
+  default; when `ENGINE` is overridden with another engine, it no longer
+  applies. Passed to `/setup-engine`. If an engine is already configured in
   `.zcode/docs/technical-preferences.md`, the run respects it; otherwise it
   configures `ENGINE`. Godot is the default because its web export is the
   cleanest path for the default `PREFERRED_TARGET`.
