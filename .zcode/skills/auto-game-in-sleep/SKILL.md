@@ -1,18 +1,22 @@
 ---
 name: auto-game-in-sleep
-description: "Fully autonomous overnight game production run (auto-game-in-sleep). Chains every studio workflow from concept to polished game, makes all decisions on the user's behalf (logged for audit), tests the running game itself via web export + browser automation, iterates until quality bars are met or the time budget runs out, and leaves a morning report. Use when the user asks for a hands-off / overnight / fully automatic run — e.g. 'auto-game-in-sleep', 'autopilot', 'run the whole pipeline yourself', '睡一觉醒来游戏做好', '一晚上自动做完游戏', '不要问我，全部自己决定'."
-argument-hint: "[max-hours | resume | fresh] [— review: solo|lean|full] [— testing: browser|headless]"
+description: "Fully autonomous unattended game production run (auto-game-in-sleep — 'make the game while you're not at the keyboard'). Chains every studio workflow from concept to polished game, makes all decisions on the user's behalf (logged for audit), tests the running game itself via web export + browser automation, iterates until quality bars are met, and leaves a report for when you return. Game languages (array) and project-doc language are configurable. Use when the user wants a hands-off / non-interactive / fully automatic run — e.g. 'auto-game-in-sleep', 'autopilot', 'run the whole pipeline yourself', '睡一觉醒来游戏做好', '一晚上自动做完游戏', '不要问我，全部自己决定'."
+argument-hint: "[resume | fresh] [— review: solo|lean|full] [— testing: browser|headless] [— game-lang: 简体中文,English] [— docs-lang: 简体中文] [— engine: Godot] [— target: Web] [— debug: control-browser] [— art: svg] [— rounds: 5] [— score: 9]"
 user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, TodoWrite, Agent, Skill
 ---
 
-# auto-game-in-sleep — Autonomous Overnight Studio Run
+# auto-game-in-sleep — Autonomous Unattended Studio Run
+
+`auto-game-in-sleep` means "make the game while you're not driving" — the run
+executes in a non-interactive state, with no user in the loop. It is not a
+literal overnight timer; the name is about *unattended* execution.
 
 One invocation of this skill = one complete studio run. You pick up wherever
 the project stands (or start from nothing), drive the full pipeline defined in
 `.zcode/docs/workflow-catalog.yaml`, test the running game yourself, and only
-stop when the game is done or the time budget is spent. The user is asleep.
-**There is no one to ask.**
+stop when the game is done or further progress is impossible. **There is no one
+to ask — the user is away from the keyboard.**
 
 Autopilot overrides the interactive behaviors of every other skill in this
 template. When you execute a workflow skill while running this pipeline, its
@@ -25,25 +29,95 @@ quality bars, artifact paths) applies unchanged.
 - `production/auto-game-in-sleep/decisions.md` — append-only decision log (the user audits this)
 - `production/auto-game-in-sleep/journal.md` — timestamped, self-contained progress journal
 - `production/auto-game-in-sleep/test-runs/` — build logs, screenshots, browser test notes
-- `production/auto-game-in-sleep/morning-report.md` — what the user reads when they wake up
+- `production/auto-game-in-sleep/morning-report.md` — the report for when the user returns (what was built, how to run it, what to do next)
 
 ---
 
 ## Constants
 
-Override via arguments: `/auto-game-in-sleep 10 — review: solo, testing: headless`
+Override via arguments: `/auto-game-in-sleep — review: solo — testing: headless — game-lang: 简体中文,English — docs-lang: 简体中文 — engine: Godot — target: Web — debug: control-browser — art: svg — rounds: 5 — score: 9`
 
-- **BUDGET_HOURS = 8** — wall-clock budget for the whole run. First positional
-  argument wins (`resume`/`fresh` don't set it).
+- **NO TIME CAP.** This skill imposes no time limit and you must not invent
+  one. Run until the pipeline is complete or genuinely blocked. How long that
+  takes depends on external factors (API throughput, tool availability) that
+  you cannot estimate — guessing a duration only makes you stop early. The
+  closest thing to a "stop" is the quality/stall logic below, never a clock.
+- **GAME_LANGS = [简体中文]** — the languages the shipped game contains, as an
+  array. Element `[0]` is the primary/default in-game language: all UI text,
+  dialogue, menus, subtitles, and in-world text are authored in it. Each extra
+  entry is a localization target — build the game localization-ready and, once
+  playable, run `/localize` to populate that language's string table. A
+  single-entry run just ships `GAME_LANGS[0]`.
+- **DOCS_LANG = 简体中文** — the language every generated *project document*
+  is written in: GDDs, art bible, ADRs, architecture, UX specs, review and
+  playtest reports, the decision log, and the return report. This is the
+  language *you* read, and it is independent of the game's own language.
+- **ENGINE = Godot** — the engine to configure when the project has none set.
+  Passed to `/setup-engine`. If an engine is already configured in
+  `.zcode/docs/technical-preferences.md`, the run respects it; otherwise it
+  configures `ENGINE`. Godot is the default because its web export is the
+  cleanest path for the default `PREFERRED_TARGET`.
+- **PREFERRED_TARGET = Web** — the primary shipped artifact. The run builds and
+  verifies toward this target (for `Web`, the Test Loop serves a web build and
+  drives it in a browser). Adapt the build path and verification when this is a
+  desktop or other target.
+- **DEBUG_SKILL = control-browser** — the browser-automation skill used to play
+  and observe the running game in the Test Loop. Load its own guide first if it
+  ships one. Falls back to any other browser tooling, then to headless checks,
+  if unavailable.
+- **ART_METHOD = svg** — how art assets are actually produced. Default is a
+  self-contained, no-image-model pipeline:
+  - `svg` (default) — for each asset spec: (1) keep the AI-generation prompt in
+    the spec for later human upgrade; (2) author the art as **SVG** (text the
+    agent can write and iterate directly); (3) **rasterize** the SVG to PNG/JPG
+    at the spec's dimensions (cairosvg / rsvg-convert / Inkscape) — this raster
+    is what gets visually inspected; (4) **convert to an engine asset** — only
+    if the format isn't already PNG/JPG/SVG (Godot imports those natively, so
+    usually skip this step; convert only when the engine needs a specialized
+    texture/atlas format); (5) load the build, **visually check** the raster
+    (the model if it has vision, otherwise a vision MCP / `DEBUG_SKILL`) and
+    iterate the SVG until it matches the spec. No external image model required;
+    the game ships with real (vector-derived) art, not placeholders.
+  - `generate` — run each spec's prompt through an image-generation tool/MCP
+    instead of drawing SVG, then `/asset-audit` and advance the manifest to
+    `Done`. Use this when a real image model is wired in and you want
+    model-produced art over vector art.
 - **REVIEW_MODE = lean** — director review at phase gates (`/gate-check`).
   `solo` skips gate reviews entirely (fastest, riskiest). `full` adds
   per-workflow director reviews. Only overrides `production/review-mode.txt`
   when explicitly passed; otherwise respect the existing file.
+- **MAX_ROUNDS = 5** — cap on adversarial review-loop rounds (see that
+  subsection). The loop also stops early once the score threshold is met.
+- **SCORE_THRESHOLD = 9** — overall score (0–10) that ends the adversarial
+  review loop, combined with the `真实可玩性 ≥ 8` hard gate.
 - **TESTING = browser** — `browser` = web build + browser-automation playtest
   (rule 2 in full). `headless` = engine headless runs and screenshots only
   (use when no browser tooling exists). Never choose `off`.
 - **RESUME = auto** — resume an interrupted run when state exists; `fresh`
   forces a new run; `resume` forces continuing.
+
+## Language
+
+Two independent language settings — do not conflate them:
+
+- **Game content** (UI strings, dialogue, menus, subtitles, in-world text) is
+  authored in `GAME_LANGS[0]`. Extra entries are localization targets: keep
+  all strings in external string tables (never hardcoded in scenes/scripts),
+  and once the game is playable, run `/localize` for each additional language
+  to populate its table. A single-language run ships only `GAME_LANGS[0]`.
+- **Project documents** (GDDs, art bible, ADRs, architecture, UX specs, review
+  and playtest reports, the decision log, and the return report) are written in
+  `DOCS_LANG` — the language *you* read. This is independent of the game's
+  language: a Japanese game can sit on top of Chinese dev docs.
+
+Discipline:
+
+- Never hardcode in-game text in scenes or scripts — it must stay localizable,
+  because `GAME_LANGS` may name more than one language.
+- Dev docs are always in `DOCS_LANG`, never in the game's language.
+- If `GAME_LANGS` has more than one entry, add a localization pass to the
+  Release phase: after `/launch-checklist`, run `/localize` once per extra
+  language, then re-run the relevant test checkpoint to confirm no broken strings.
 
 ## The Five Behavior Rules
 
@@ -63,9 +137,9 @@ You have no user. Every point where a workflow skill says *"use AskUserQuestion"
    bible. The consistent answer is almost always already written down.
 2. **If the record doesn't answer it, decide as the studio would.** Pick the
    option that best serves the concept's pillars, the target scope tier, and
-   standard game-development practice. Prefer the option that increases
-   player-facing quality over the option that saves effort — except when it
-   threatens the budget (see rule 5).
+  standard game-development practice. Prefer the option that increases
+  player-facing quality over the option that saves effort — except when it
+  risks leaving the game incomplete (see rule 5).
 3. **Log every decision** in `production/auto-game-in-sleep/decisions.md`:
 
    ```markdown
@@ -92,9 +166,9 @@ You have no user. Every point where a workflow skill says *"use AskUserQuestion"
 "Code compiles" is not "the game works". At every checkpoint listed in the
 Test Loop below, you produce a build, run it, and observe it — through a
 browser when the engine exports to web (Godot does; Unity WebGL does), via
-headless runs and engine screenshots otherwise. Use the browser-automation
-skill available in the environment (`agent-browser` when installed; fall back
-to any other browser tooling, then to headless-only checks). Details in
+headless runs and engine screenshots otherwise. Use the debug skill
+`DEBUG_SKILL` (default `control-browser`) to play and observe the build; fall
+back to any other browser tooling, then to headless-only checks. Details in
 **The Test Loop**.
 
 ### 3. Chain the pipeline — never stop between workflows
@@ -104,7 +178,7 @@ exists and its gate accepts it, the next step in the pipeline starts — same
 session, no summary-and-stop. The full ordered chain is in **The Pipeline**
 below; `.zcode/docs/workflow-catalog.yaml` is the source of truth for
 completion checks. The only legitimate ways a run moves from step X to "stop"
-are: budget exhausted (wrap up) or all steps complete (wrap up).
+are: the run is genuinely blocked (wrap up) or all steps complete (wrap up).
 
 ### 4. Build the full game, not the minimal one
 
@@ -123,20 +197,18 @@ substitute a smaller game because no one stopped you.
   full tier IS the small game — build it completely, then polish it deeply.
   Polishing a small game fully beats half-finishing a big one.
 
-### 5. Budget, not perfection, ends the run — but the clock never acquits
+### 5. Run to completion, not to a clock
 
-Default budget: 8 hours (override via argument). Track elapsed time
-(`state.json.started_at` vs current time). When remaining time drops below
-~45 minutes, stop starting new work and execute Wrap-Up.
+There is no time budget. Keep working through the pipeline until it is
+complete or genuinely blocked — see Wrap-Up for the only legitimate stop
+conditions. Do not invent a duration limit, and do not treat "the user is
+away" as a reason to rush or cut scope.
 
-Two complementary prohibitions:
+One non-negotiable prohibition:
 
-- **The clock may say "stop", never "good enough".** Budget exhaustion ends
-  the run; it does not declare the game acceptable. The morning report states
-  plainly which quality bars were and were not met at cutoff.
 - **Quality gates may say "not yet", never "forever".** A gate failing does
   not end the run — fix and re-test (rule 1's decision protocol applies to
-  how). Only the budget or full completion ends work.
+  how). Only full completion or a genuine block ends work.
 
 Blocked items never stop the run: if a single problem survives the debug
 discipline (see Test Loop), or a required external resource is missing
@@ -151,12 +223,10 @@ Only wrap up early when progress is genuinely impossible — and say so honestly
 Read `production/auto-game-in-sleep/state.json` if it exists (respect the
 `RESUME` constant).
 
-- **Exists and `status: "running"`** — resume: set the budget clock from the
-  original `started_at` unless the user passed a fresh budget. Verify every
-  step recorded `done` but not `accepted` (see state schema below) by
-  re-running its acceptance check — an executor finishing is not evidence.
-  Continue at the first non-accepted step. Journal one line:
-  `RESUMED at <step>; <n> hours spent previously`.
+- **Exists and `status: "running"`** — resume: verify every step recorded
+  `done` but not `accepted` (see state schema below) by re-running its
+  acceptance check — an executor finishing is not evidence. Continue at the
+  first non-accepted step. Journal one line: `RESUMED at <step>`.
 - **Exists and `status: "done"`/`"wrapped"`** — start a fresh run (archive
   the old run dir into `production/auto-game-in-sleep/archive-<date>/` first).
 - **Missing** — new run. Create the directory and initial `state.json`:
@@ -166,7 +236,6 @@ Read `production/auto-game-in-sleep/state.json` if it exists (respect the
   "status": "running",
   "started_at": "<ISO timestamp>",
   "last_seen": "<ISO timestamp>",
-  "budget_hours": 8,
   "current_phase": "concept",
   "current_step": "bootstrap",
   "mvp_milestone": false,
@@ -193,7 +262,7 @@ Read `production/auto-game-in-sleep/state.json` if it exists (respect the
   are not (see Reviewer Independence in the Iteration Loop).
 
 Also create `decisions.md` and `journal.md` with a
-`# Run started <date> <time>, budget <N>h` header.
+`# Run started <date> <time>` header.
 
 Then detect the project stage the same way `/project-stage-detect` does:
 engine configured? concept exists? GDDs? ADRs? stories? playable code? This
@@ -215,7 +284,7 @@ context-compacted or restarted session can resume from the journal alone.
 If the project has no concept yet, you are the studio today. Do, in order:
 
 1. **Concept**: run the `/brainstorm` process yourself (no user interview):
-   choose a concept that is ambitious but shippable within the budget — one
+   choose a concept that is ambitious but shippable — one
    strong core verb, 2–3 systems deep, genre with proven fun patterns.
    Write `design/gdd/game-concept.md` with an explicit scope tier table and
    mark the **full tier** as the target. Announce it in the journal.
@@ -237,7 +306,7 @@ order and the repeat rules). Invoke each step's skill via the Skill tool and
 follow its process, with interactive pauses suspended per rule 1.
 
 **Concept**
-1. `/setup-engine` → `.zcode/docs/technical-preferences.md` names a real engine. For a web-testable target prefer Godot (clean web export).
+1. `/setup-engine [ENGINE]` → `.zcode/docs/technical-preferences.md` names a real engine. When none is configured, configure `ENGINE` (default Godot); if one is already set, respect it. Target `PREFERRED_TARGET` (default Web) — Godot+Web is the cleanest export path, which is why both default there.
 2. Concept document exists (done in bootstrap, or `/brainstorm` for an existing vague project) → `design/gdd/game-concept.md`
 3. `/design-review design/gdd/game-concept.md` → fix issues it can fix itself; log anything arguable
 4. `/art-bible` → `design/art/art-bible.md`
@@ -258,6 +327,21 @@ follow its process, with interactive pauses suspended per rule 1.
 
 **Pre-Production**
 15. `/asset-spec` inventory + per-asset specs → `design/assets/entity-inventory.md`, `asset-manifest.md` (skip if visually trivial — journal the skip)
+
+    **Asset production** (driven by `ART_METHOD`, after specs exist):
+    - `svg` (default) — keep each spec's AI prompt for later human upgrade;
+      author the art as SVG, then:
+      1. **Rasterize** the SVG to PNG/JPG at the spec's dimensions (cairosvg /
+         rsvg-convert / Inkscape) — this raster is what gets visually inspected.
+      2. **Convert to an engine asset** — only if the format isn't already
+         PNG/JPG/SVG (Godot imports those natively, so usually omit this step;
+         convert only when the engine needs a specialized texture/atlas format).
+      3. **Visually check** by loading the build and inspecting the raster (the
+         model if it has vision, otherwise a vision MCP / `DEBUG_SKILL`), and
+         **iterate the SVG** until it matches the spec. Advance the manifest to `Done`.
+    - `generate` — run each spec's prompt through an image-generation tool/MCP,
+      write the result into `assets/`, then `/asset-audit` and advance the
+      manifest to `Done`.
 16. `/ux-design` for ≥3 key screens (main menu, gameplay HUD, pause) → `design/ux/*.md`
 17. `/ux-review` → issues fixed
 18. Prototype: only if the core mechanic is genuinely high-risk (journal the decision either way)
@@ -280,11 +364,15 @@ follow its process, with interactive pauses suspended per rule 1.
 26. `/perf-profile`, `/balance-check`, `/asset-audit` → fixes applied
 27. `/playtest-report` ×3 (you are the playtester — see Test Loop checkpoint C: new-player path, core systems, difficulty curve)
 28. `/team-polish` → coordinated polish pass
+29. **Adversarial review loop** — independent scored review that drives the
+    game to a quality bar (see [The Adversarial Review Loop](#the-adversarial-review-loop)).
+    Gated by `REVIEW_MODE`: `solo` skips it; `lean` runs it once here; `full`
+    runs it per major artifact.
 
 **Release**
-29. `/release-checklist` → items fixed or logged
-30. `/patch-notes` and `/changelog` → docs written
-31. `/launch-checklist` → final gate
+30. `/release-checklist` → items fixed or logged
+31. `/patch-notes` and `/changelog` → docs written
+32. `/launch-checklist` → final gate
 
 Then Wrap-Up.
 
@@ -302,8 +390,9 @@ Run at these checkpoints:
 - **C — polish phase**: the 3 playtest sessions
 - **D — before wrap-up**: final verification of the last build
 
-Procedure per checkpoint (Godot example — adapt commands to the engine in
-`technical-preferences.md`):
+Procedure per checkpoint (commands below are the `ENGINE=Godot`,
+`PREFERRED_TARGET=Web` path; adapt the engine binary and export target when
+either differs):
 
 1. **Headless boot smoke** — catches script/runtime errors cheaply:
    `godot --headless --path . --quit-after 300` (300 frames). Any error or
@@ -314,8 +403,10 @@ Procedure per checkpoint (Godot example — adapt commands to the engine in
    blocked + fall back to headless checks and engine screenshots.
 3. **Serve** — `python -m http.server 8600 --directory build/web` in the
    background (kill it at checkpoint end).
-4. **Play it** — with browser automation (`agent-browser` if available; read
-   its core guide first via its own instructions):
+4. **Play it** — drive the running build with the debug skill `DEBUG_SKILL`
+   (default `control-browser`; load its guide first if it ships one). If
+   `DEBUG_SKILL` is unavailable, fall back to any other browser-automation
+   tooling, then to headless-only checks:
    - open `http://localhost:8600`, wait for load, screenshot
    - read console errors — any error counts as a bug
    - actually play the core loop: send input (keys/clicks), screenshot after
@@ -362,8 +453,7 @@ After the full-tier game is playable and Production is complete, iterate:
 3. Re-run the relevant test. Repeat.
 4. **Exit when all true**: all GDD acceptance criteria verified in the running
    game · latest smoke-check PASS · 3 playtest reports exist · zero open
-   critical/major bugs · 60s continuous browser play with no errors · fewer
-   than 45 minutes of budget left.
+   critical/major bugs · 60s continuous browser play with no errors.
 
 **Reviewer independence** — the agent that wrote the code does not accept
 its own quality. Machine-checkable completion (build exits 0, zero console
@@ -388,17 +478,102 @@ iterations accumulate `stale_count`:
   ones already tried. Read the journal's tried directions first and pick one
   that differs.
 - `stale_count ≥ 4` → stop iterating. Wrap up and flag the stuck area in the
-  morning report. Do not keep burning budget on a wall.
+  morning report. Do not keep grinding against a wall.
 
 Avoid thrash: if an iteration makes the test result worse, revert it (keep the
 diff in the journal) and pick a different improvement.
 
 ---
 
+## The Adversarial Review Loop
+
+A scored, independent challenge loop that pushes the game to a quality bar
+before Wrap-Up. It is the studio's equivalent of a cross-model jury: an
+independent reviewer subagent attacks the work, scores it, and forces fixes
+until a threshold — the implementer never acquits its own work.
+
+**Gating (`REVIEW_MODE`)**: `solo` skips the loop entirely; `lean` runs it once
+at the Polish step above; `full` runs it per major artifact (per system GDD,
+per sprint, per release gate). When skipped, journal it.
+
+**One reviewer, all dimensions.** Spawn a single fresh-context reviewer
+subagent (e.g. `creative-director` or `qa-lead` — never the agent that wrote the
+code) to score every dimension below and emit 意见 / 建议 / 疑问. Scoring from a
+single rater keeps the dimensions comparable across rounds.
+
+**Mechanism per round**
+
+1. **Gather evidence via the debug skill.** The main agent builds the game,
+   launches it, and drives it with `DEBUG_SKILL` (`control-browser`): enter the
+   game, play the core loop, pause/resume, reach a win/lose, capture screenshots,
+   console output, and input→feedback notes. Write the evidence pack to
+   `production/auto-game-in-sleep/test-runs/review-<round>.md`. Real-play
+   dimensions are scored **only** from this pack — never from reading code.
+2. **Hand the pack to the reviewer.** Give the subagent: the evidence pack, the
+   GDD acceptance criteria, and the score tables below. For Part A it may also
+   read the GDDs and source in its fresh context; for Part B it scores strictly
+   from the evidence pack.
+3. **The reviewer scores and writes** 意见 / 建议 / 疑问 (formats below). Every
+   dimension score carries a one-line reason anchored to the rubric, so it
+   cannot be handed out arbitrarily.
+4. **The main agent implements the 建议** (prioritized fixes), then the next
+   round begins. Update `state.json`: `iterations`, `stale_count`, and the
+   `adversarial-review` step's `done`/`accepted` + evidence path.
+
+**Scoring — two parts, six dimensions (each 0–10)**
+
+Part A — design & implementation (static; from GDD + source)
+
+| Dimension | 0 | 5 | 8 | 10 |
+|-----------|---|---|---|----|
+| 完整度 | GDD-promised systems mostly absent | core present, several GDD features missing | all MVP systems in place, minor gaps | full tier implemented per GDD |
+| 新颖性 | cliché clone, no identity | competent but familiar | clear original turn on a known genre | genuinely novel core loop |
+| 架构与可维护性 | spaghetti, no structure | follows basic conventions, some smells | clean, follows `.zcode/rules` | exemplary, easy to extend |
+
+Part B — artifact (dynamic; scored **only** from the `DEBUG_SKILL` evidence pack)
+
+| Dimension | 0 | 5 | 8 | 10 | source |
+|-----------|---|---|---|----|--------|
+| 真实可玩性 | can't even enter / crashes on boot | enters but core loop breaks early / softlock | core loop completable to win/lose, minor issues | smooth full playthrough, no blockers | DEBUG_SKILL play |
+| 界面美观性 (static) | broken / unstyled | functional but plain | clean, on-theme | polished, clear, matches art bible | DEBUG_SKILL frame |
+| 动态体验 (feel/feedback) | no feedback, laggy input | basic feedback, ok response | clear timely feedback, satisfying | excellent juice, fluid | DEBUG_SKILL play |
+
+`真实可玩性` and `动态体验` are dynamic (during play); `界面美观性` is the
+static look — the three are orthogonal.
+
+**Aggregate & termination**
+
+- **总分 = mean of the 6 dimension scores.**
+- **Hard gate**: while `真实可玩性 < 8`, the loop MUST NOT stop — a 9/10 average
+  that can't even enter the game is never accepted.
+- **Stop when**: `总分 > SCORE_THRESHOLD (9)` **and** `真实可玩性 ≥ 8`, **or**
+  `iterations > MAX_ROUNDS (5)`.
+- On stop, record the final scores in the `adversarial-review` step as
+  `accepted` (with the evidence pack path) and carry them into the morning
+  report's Quality bars section.
+
+**Outputs per round (the reviewer writes)**
+
+- **意见** — per-dimension score + one-line reason; what works, what doesn't.
+- **建议** — concrete, prioritized fixes; each tied to a dimension; mark which
+  are the minimum to clear the threshold.
+- **疑问** — things the reviewer cannot resolve from evidence (e.g. "is X
+  intended or a bug?"). If a 疑问 blocks acceptance, log it to the blocked list
+  / morning report for the human.
+
+**Reuses (no new machinery)**
+
+- *done≠accepted* — the loop step is `accepted` only with the score + evidence
+  pack on file; "I fixed it" is not evidence.
+- *stale ladder* — a round with zero new findings increments `stale_count`;
+  ≥2 forces a different review angle next round; ≥4 stops the loop and wraps up.
+- *reviewer independence* — fresh subagent, never the implementer; scores from
+  evidence (Part B) / fresh read (Part A), not its own memory.
+
 ## Wrap-Up
 
-When the budget nears its end, the pipeline finishes, `stale_count` hits the
-ladder top, or progress becomes impossible:
+When the pipeline finishes, `stale_count` hits the ladder top, or progress
+becomes impossible:
 
 1. Ensure the last build in `build/` (or equivalent) is the best one; rebuild
    web if the fix loop changed anything. Kill background servers.
@@ -415,9 +590,9 @@ ladder top, or progress becomes impossible:
    <exact command / file to open>
    ## What was produced
    <phases completed, stories closed, test runs, playtest reports — with paths>
-   ## Quality bars at cutoff
-   <which acceptance criteria / gates PASSED, which did NOT — the clock
-   stopped the run; it did not bless the game. Be exact.>
+   ## Quality bars
+   <which acceptance criteria / gates PASSED, which did NOT — be exact. The
+   run stopped because it completed or hit a stall, never because a clock ran out.>
    ## Decisions I made for you
    <top 5–10 from decisions.md, most consequential first — link the file>
    ## Bugs & known issues
@@ -457,7 +632,7 @@ ladder top, or progress becomes impossible:
   design, code, and reviews still proceed.
 - **Existing project mid-pipeline**: enter at the first step whose acceptance
   evidence is missing. Trust checks, not memory — verify each prior artifact.
-- **Project has a concept but zero code and <2h budget left**: skip to a
+- **Project has a concept but zero code and you must deliver a minimal-but-complete game**: skip to a
   compressed but complete pass: concept polish → map/design systems →
   architecture-lite → single epic → implement → test loop → report.
 - **Test keeps failing on the same core loop**: apply the debug discipline

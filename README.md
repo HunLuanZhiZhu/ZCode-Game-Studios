@@ -53,7 +53,7 @@ The result: you still make every decision, but now you have a team that asks the
 | Category | Count | Description |
 |----------|-------|-------------|
 | **Agents** | 49 | Specialized subagents across design, programming, art, audio, narrative, QA, and production |
-| **Skills** | 74 | Slash commands for every workflow phase (`/start`, `/design-system`, `/create-epics`, `/create-stories`, `/dev-story`, `/story-done`, etc.), including `/auto-game-in-sleep` for fully hands-off overnight runs |
+| **Skills** | 74 | Slash commands for every workflow phase (`/start`, `/design-system`, `/create-epics`, `/create-stories`, `/dev-story`, `/story-done`, etc.), including `/auto-game-in-sleep` for fully hands-off unattended runs |
 | **Hooks** | 12 | Automated validation on commits, pushes, asset changes, session lifecycle, agent audit trail, and gap detection |
 | **Rules** | 11 | Path-scoped coding standards enforced when editing gameplay, engine, AI, UI, network code, and more |
 | **Templates** | 41 | Document templates for GDDs, UX specs, ADRs, sprint plans, HUD design, accessibility, and more |
@@ -97,7 +97,7 @@ The template includes agent sets for all three major engines. Use the set that m
 Type `/` in Claude Code to access all 74 skills:
 
 **Full Autonomy**
-`/auto-game-in-sleep` — one command runs the entire studio overnight: every workflow from concept to polish, decisions made on your behalf (logged), the game built, played in a browser, and iterated until done. See [Overnight Autopilot](#overnight-autopilot-auto-game-in-sleep).
+`/auto-game-in-sleep` — one command runs the entire studio unattended: every workflow from concept to polish, decisions made on your behalf (logged), the game built, played in a browser, and iterated until done. See [Unattended Autonomy](#unattended-autonomy-auto-game-in-sleep).
 
 **Onboarding & Navigation**
 `/start` `/help` `/project-stage-detect` `/setup-engine` `/adopt`
@@ -246,10 +246,11 @@ By default this is **not** an auto-pilot system. Every agent follows a strict co
 
 You stay in control. The agents provide structure and expertise, not autonomy.
 
-### Overnight Autopilot (auto-game-in-sleep)
+### Unattended Autonomy (auto-game-in-sleep)
 
-When you **explicitly** run `/auto-game-in-sleep [max-hours]`, the studio
-switches to autonomous mode for that run:
+When you **explicitly** run `/auto-game-in-sleep`, the studio switches to
+autonomous mode for that run (no time limit — it runs until the game is done
+or genuinely blocked, in the background while you are not at the keyboard):
 
 - **The full pipeline chains itself** — concept → systems design → architecture →
   pre-production → sprints → polish → release, with no pausing between workflows.
@@ -261,20 +262,30 @@ switches to autonomous mode for that run:
 - **The game builds the full scope, not a demo** — the target is the complete
   tier from the game concept; a minimal version is a milestone on the way, never
   the destination.
-- **It plays its own game** — web builds are served locally and driven with
-  browser automation (e.g. `agent-browser`): boot, core loop, menus, game over,
+- **It plays its own game** — web builds are served locally and driven with a
+  browser-automation skill (e.g. `control-browser`): boot, core loop, menus, game over,
   console errors, screenshots — feeding real bugs back into the sprint loop.
+- **Produces art per `ART_METHOD`** — `svg` by default: writes AI prompts for
+  later human upgrade, draws the art as SVG, rasterizes it to PNG for visual
+  checking (model or vision MCP), converts to an engine asset only if the format
+  isn't already PNG/JPG/SVG, then iterates the SVG (no image model needed; ships
+  real vector-derived art). `generate` instead calls an image tool for model-produced art.
+- **Runs an adversarial review loop** — an independent reviewer subagent scores
+  the game on six dimensions (completeness / novelty / architecture from code;
+  real playability / UI aesthetics / game feel from actual `control-browser`
+  playthrough), forces fixes, and only stops at `总分 > 9` with `真实可玩性 ≥ 8`
+  or after `MAX_ROUNDS = 5`. Gated by `REVIEW_MODE` (`solo` skips).
 - **It iterates until good** — playtest → top improvements → re-test, until all
-  GDD acceptance criteria pass, smoke check passes, and 3 playtest reports exist
-  (or the time budget runs out). Quality verdicts come from independent
-  reviewer subagents, never from the agent that wrote the code, and repeated
-  stalled iterations force a change of approach instead of more parameter tweaking.
+  GDD acceptance criteria pass, smoke check passes, and 3 playtest reports exist.
+  Quality verdicts come from independent reviewer subagents, never from the agent
+  that wrote the code, and repeated stalled iterations force a change of approach
+  instead of more parameter tweaking.
 - **Done is not accepted** — every pipeline step records `done` (executor
   finished) separately from `accepted` (gate passed, evidence on file), so an
   interrupted run resumes by re-verifying rather than trusting.
-- **You get a morning report** — `production/auto-game-in-sleep/morning-report.md`:
-  what was built, how to run it, which quality bars passed or missed at cutoff,
-  every decision made, open issues, and what to do next.
+- **You get a return report** — `production/auto-game-in-sleep/morning-report.md`:
+  what was built, how to run it, which quality bars passed or were missed, every
+  decision made, open issues, and what to do next.
 
 Safety rails still apply: no `git push`, no deletions of your content, guard
 hooks stay active, and the run resumes cleanly if interrupted
