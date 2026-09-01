@@ -54,3 +54,40 @@ Path-scoped rules live in `.zcode/rules/`.
 ## Context Management
 
 @.zcode/docs/context-management.md
+
+<!-- ZCGS:BEGIN -->
+## ZCGS Orchestrator — Anti-Compression Anchor
+
+> Managed by `bash init.sh`. Do not edit this block manually — rerun `bash init.sh` to refresh.
+> This is the only text guaranteed to survive context compaction: `AGENTS.md` is
+> re-injected every session and after every compaction (as a new conversation), while conversation history is not.
+> This block is STATIC — it holds instructions and pointers, never live state values.
+
+### State Pointer (live state lives here — this block never holds stale values)
+
+- Run state (machine truth): `production/auto-game-in-sleep/state.json`
+  - If it does not exist, the run has not started — create it per the skill's heartbeat discipline (see below).
+- Human-readable log: `production/auto-game-in-sleep/journal.md` (self-contained, last 50 lines are enough to resume)
+- Decision audit trail: `production/auto-game-in-sleep/decisions.md`
+- Test evidence packs: `production/auto-game-in-sleep/test-runs/`
+- Orchestrator spec (re-read after compaction): `.zcode/skills/auto-game-in-sleep/SKILL.md` (~650 lines, 32 steps)
+- Pipeline catalog: `.zcode/docs/workflow-catalog.yaml`
+- This block does NOT contain `state` / `current_phase` / `last_seen` — those live only in `state.json`.
+
+### Recovery Protocol (run immediately after compaction or new conversation)
+
+1. **Re-read the orchestrator spec.** Your conversation history has been summarized and the full skill text is gone. Read `.zcode/skills/auto-game-in-sleep/SKILL.md` (and `.zcode/docs/workflow-catalog.yaml`) NOW, before any other action. Do NOT rely on your summary's memory of the pipeline — the 32 steps, 5 behavior rules (NO TIME CAP, Decision Protocol, test loop, chain, full-tier), and acceptance definitions only exist in those files after compaction.
+2. Read `production/auto-game-in-sleep/state.json` — `status`, `current_phase`, `current_step`, `iterations`, `stale_count`, `blocked`, `steps[]`. If the file does not exist, the run has not started; follow the skill's Phase 0 to create it.
+3. Read `production/auto-game-in-sleep/journal.md` (last 50 lines) — self-contained progress; also scan `decisions.md` for recent overrides.
+4. If `state.json` `status == "running"`: resume the pipeline at the first `steps[]` entry whose `status != "accepted"` (re-verify any `done` without evidence). Follow the spec you just re-read in step 1, step-by-step. Do not stop for user questions.
+5. Heartbeat discipline: at the START of every pipeline step, update `state.json` `last_seen`/`current_phase`/`current_step` and append a self-contained entry to `journal.md` before any long or crash-prone work — so the next compaction finds the true position in the state file, not in this AGENTS.md block.
+
+### Rules while the orchestrator is active
+
+- The Decision Protocol in `auto-game-in-sleep` suspends the `Question -> Options -> Decision -> Draft -> Approval` gate in `AGENTS.md#Collaboration Protocol`. Decisions are made autonomously and appended to `decisions.md` (template: Context / Options / Chose / Override).
+- Never mark a step `accepted` without evidence (review report / test record / catalog artifact — see skill § Phase 0 / Steps definition).
+- `journal.md` entries must be self-contained (what was attempted, what is next, which paths matter) so a compacted session can resume from the journal alone.
+- This block coexists with `production/session-state/active.md` (`.zcode/docs/context-management.md`); that file tracks interactive work, while this block tracks the unattended orchestrator.
+
+<!-- initialized: 2026-09-01T09:57:41Z — rerun bash init.sh to refresh -->
+<!-- ZCGS:END -->
