@@ -1,7 +1,7 @@
 ---
 name: auto-game-in-sleep
 description: "Fully autonomous unattended game production run (auto-game-in-sleep — 'make the game while you're not at the keyboard'). Chains every studio workflow from concept to polished game, makes all decisions on the user's behalf (logged for audit), tests the running game itself via web export + browser automation, iterates until quality bars are met, and leaves a report for when you return. Game languages (array) and project-doc language are configurable. Use when the user wants a hands-off / non-interactive / fully automatic run — e.g. 'auto-game-in-sleep', 'autopilot', 'run the whole pipeline yourself', '睡一觉醒来游戏做好', '一晚上自动做完游戏', '不要问我，全部自己决定'."
-argument-hint: "[resume | fresh] [— review: solo|lean|full] [— testing: browser|headless] [— game-lang: 简体中文,English] [— docs-lang: 简体中文] [— engine: Godot] [— target: Web] [— debug: control-browser] [— art: svg] [— vision: auto|native|mcp|none] [— rounds: 5] [— score: 9]"
+argument-hint: "[resume | fresh] [— review: solo|lean|full] [— testing: browser|headless] [— game-lang: 简体中文,English] [— docs-lang: 简体中文] [— engine: Godot] [— target: Web] [— debug: control-browser] [— art: svg] [— vision: auto|native|mcp] [— rounds: 5] [— score: 9]"
 user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, TodoWrite, Agent, Skill
 ---
@@ -35,7 +35,7 @@ quality bars, artifact paths) applies unchanged.
 
 ## Constants
 
-Override via arguments: `/auto-game-in-sleep — review: solo — testing: headless — game-lang: 简体中文,English — docs-lang: 简体中文 — engine: Godot — target: Web — debug: control-browser — art: svg — vision: auto — rounds: 5 — score: 9`
+Override via arguments: `/auto-game-in-sleep — review: solo — testing: headless — game-lang: 简体中文,English — docs-lang: 简体中文 — engine: Godot — target: Web — debug: control-browser — art: svg — vision: auto|native|mcp — rounds: 5 — score: 9`
 
 - **NO TIME CAP.** This skill imposes no time limit and you must not invent
   one. Run until the pipeline is complete or genuinely blocked. How long that
@@ -74,26 +74,30 @@ Override via arguments: `/auto-game-in-sleep — review: solo — testing: headl
   - `svg` (default) — for each asset spec: (1) keep the AI-generation prompt in
     the spec for later human upgrade; (2) author the art as **SVG** (text the
     agent can write and iterate directly); (3) **rasterize** the SVG to PNG/JPG
-    at the spec's dimensions (cairosvg / rsvg-convert / Inkscape) — this raster
-    is what gets visually inspected; (4) **convert to an engine asset** — only
-    if the format isn't already PNG/JPG/SVG (Godot imports those natively, so
+    at the spec's dimensions — **prefer browser screenshots**: serve the file
+    locally (`python -m http.server`) and capture with `DEBUG_SKILL` (`control-browser`)
+    at the spec’s width/height; the screenshot is both the raster and the visual check
+    artifact. Fall back to `cairosvg` / `rsvg-convert` / `Inkscape` only when the
+    browser is unavailable.  (4) **convert to an engine asset** — only
+    if the format isn't already PNG/JPG/SVG (most engines, e.g. Godot, import those natively, so
     usually skip this step; convert only when the engine needs a specialized
     texture/atlas format); (5) **visually check** the raster per `VISION`
-    (`native`/`auto` with native capability reads the image directly;
-    `mcp` reads via the vision MCP; `none` — or `auto` with no capability —
-    skips visual iteration and advances with the raster as-is, logging the skip)
-    and iterate the SVG until it matches the spec when vision is available.
+    (`native`
+    reads the image directly, `mcp` reads via the vision MCP, `auto` probes native
+    first then MCP) and iterate the SVG until it matches the spec. A missing vision
+    capability is a **blocking** error — do not silently skip; log `blocked` and stop
+    the art sub-flow until vision is available.
     No external image model required;
     the game ships with real (vector-derived) art, not placeholders.
   - `generate` — run each spec's prompt through an image-generation tool/MCP
     instead of drawing SVG, then `/asset-audit` and advance the manifest to
     `Done`. Use this when a real image model is wired in and you want
     model-produced art over vector art.
-- **VISION = auto** — how the run sees images. Do not let the model guess. The value here is the authority; there is no "if it has vision" self-test.
-  - `auto` (default) — probe once at startup: try native image read first (direct `Read` of image files / `control-browser` screenshots); if unavailable, try the vision MCP; if neither exists, degrade gracefully.
-  - `native` — force direct image read. If the host cannot read images, log `blocked` and continue in degraded mode; do not silently guess.
-  - `mcp` — force the vision MCP path (e.g. `view_image` / `read_image` tools). If the MCP is absent, log `blocked` and continue degraded.
-  - `none` — declare no vision. Art still authors SVG and rasterizes it, but skips visual iteration; playtests and the adversarial Part B record text/log evidence without screenshots and never fabricate visual scores. Degraded mode is honest, not blind guessing.
+- **VISION = auto|native|mcp** — how the run sees images. Do not let the model guess. The value here is the authority; there is no "if it has vision" self-test.
+  - `auto` (default) — probe once at startup: try native image read first (direct `Read` of image files / `control-browser` screenshots); if unavailable, try the vision MCP. If neither exists, this is a **blocking** error — log `blocked` and stop the art/playtest sub-flow; do not degrade silently.
+  - `native` — force direct image read. If the host cannot read images, log `blocked` as a hard error; do not silently skip visual checks.
+  - `mcp` — force the vision MCP path (e.g. `view_image` / `read_image` tools). If the MCP is absent, log `blocked` as a hard error.
+  Vision is **required** — a game without visual verification is not shippable. There is no `none` mode.
 - **REVIEW_MODE = lean** — director review at phase gates (`/gate-check`).
   `solo` skips gate reviews entirely (fastest, riskiest). `full` adds
   per-workflow director reviews. Only overrides `production/review-mode.txt`
@@ -368,16 +372,19 @@ follow its process, with interactive pauses suspended per rule 1.
     **Asset production** (driven by `ART_METHOD`, after specs exist):
     - `svg` (default) — keep each spec's AI prompt for later human upgrade;
       author the art as SVG, then:
-      1. **Rasterize** the SVG to PNG/JPG at the spec's dimensions (cairosvg /
-         rsvg-convert / Inkscape) — this raster is what gets visually inspected.
+      1. **Rasterize** the SVG to PNG/JPG at the spec's dimensions — **prefer
+         browser screenshots**: serve the SVG locally and capture with
+         `DEBUG_SKILL` (`control-browser`) at the spec’s dimensions; the
+         screenshot is both the raster and the visual-check artifact. Fall back
+         to `cairosvg` / `rsvg-convert` / `Inkscape` only when the browser is
+         unavailable.
       2. **Convert to an engine asset** — only if the format isn't already
-         PNG/JPG/SVG (Godot imports those natively, so usually omit this step;
+         PNG/JPG/SVG (most engines, e.g. Godot, import those natively, so usually omit this step;
          convert only when the engine needs a specialized texture/atlas format).
-      3. **Visually check** per `VISION` (load the build and inspect the raster:
-          `native`/`auto` reads directly, `mcp` via the vision MCP, `none` skips
-          visual iteration). **Iterate the SVG** until it matches the spec when
-          vision is available. Advance the manifest to `Done` (log a skip when
-          vision is unavailable).
+      3. **Visually check** per `VISION` (`native` reads directly, `mcp` via the
+         vision MCP, `auto` probes native first then MCP). **Iterate the SVG**
+         until it matches the spec. If vision is unavailable, do not skip —
+         log `blocked` and stop this asset’s sub-flow.
     - `generate` — run each spec's prompt through an image-generation tool/MCP,
       write the result into `assets/`, then `/asset-audit` and advance the
       manifest to `Done`.
