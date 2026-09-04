@@ -443,18 +443,28 @@ either differs):
 1. **Headless boot smoke** — catches script/runtime errors cheaply:
    `godot --headless --path . --quit-after 300` (300 frames). Any error or
    script failure in output = bug. Fix before continuing.
+   Redirect output to a timestamped log: `test-runs/<checkpoint>-<YYYYMMDD-HHMMSS>.boot.log`
+   (e.g. `checkpoint-B-20260904-120500.boot.log`); judge state by reading the log tail.
 2. **Web build** — ensure `export_presets.cfg` has a Web preset (create it if
-   missing), then `godot --headless --path . --export-release "Web" ../build/web/index.html`.
+   missing), then `godot --headless --path . --export-release "Web" ../build/web/index.html`,
+   with output redirected to `test-runs/<checkpoint>-<YYYYMMDD-HHMMSS>.export.log`.
    If export templates are missing: try installing them; if that fails, log
    blocked + fall back to headless checks and engine screenshots.
-3. **Serve** — `python -m http.server 8600 --directory build/web` in the
-   background (kill it at checkpoint end).
+3. **Serve** — serve `build/web` locally. Pick the port by probing upward from
+   8600: use the first free port (`test_server_port`, recorded in `state.json`
+   so the whole checkpoint reads the same value). Example:
+   `python -m http.server <test_server_port> --directory build/web` in the
+   background (kill it at checkpoint end). Never hardcode 8600 — a stale server
+   from a previous run may still hold it.
 4. **Play it** — drive the running build with the debug skill `DEBUG_SKILL`
-   (default `control-browser`; load its guide first if it ships one). If
+   (default `control-browser`; load its guide first if it ships one). Open
+   `http://localhost:<test_server_port>` (the probed port from step 3, not a
+   hardcoded value). If
    `DEBUG_SKILL` is unavailable, fall back to any other browser-automation
    tooling, then to headless-only checks:
-   - open `http://localhost:8600`, wait for load, screenshot
-   - read console errors — any error counts as a bug
+   - open the served URL, wait for load, screenshot
+   - read console errors — any error counts as a bug; save console output to
+     `test-runs/<checkpoint>-<YYYYMMDD-HHMMSS>.console.log`
    - actually play the core loop: send input (keys/clicks), screenshot after
      each meaningful action, verify expected feedback (movement, score, state
      change, menu transitions)
