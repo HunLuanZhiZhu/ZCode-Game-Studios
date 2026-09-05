@@ -141,6 +141,7 @@ $BLOCK_BEGIN
 ### Rules while the orchestrator is active
 
 - The Decision Protocol in \`auto-game-in-sleep\` suspends the \`Question -> Options -> Decision -> Draft -> Approval\` gate in \`AGENTS.md#Collaboration Protocol\`. Decisions are made autonomously and appended to \`decisions.md\` (template: Context / Options / Chose / Override).
+- Unattended commits allowed: commit locally as workflow skills prescribe (checkpoint commits are bookkeeping, not publishing). \`git push\`, force-anything, and deleting user-authored content outside \`production/auto-game-in-sleep/\` remain forbidden — publishing stays a human act.
 - Never mark a step \`accepted\` without evidence (review report / test record / catalog artifact — see skill § Phase 0 / Steps definition).
 - \`journal.md\` entries must be self-contained (what was attempted, what is next, which paths matter) so a compacted session can resume from the journal alone.
 - This block coexists with \`production/session-state/active.md\` (\`.zcode/docs/context-management.md\`); that file tracks interactive work, while this block tracks the unattended orchestrator.
