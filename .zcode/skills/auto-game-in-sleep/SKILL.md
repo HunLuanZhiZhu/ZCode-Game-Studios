@@ -35,7 +35,15 @@ quality bars, artifact paths) applies unchanged.
 
 ## Constants
 
-Override via arguments: `/auto-game-in-sleep — review: solo — testing: headless — game-lang: 简体中文,English — docs-lang: 简体中文 — engine: Godot — target: Web — debug: control-browser — art: svg — vision: auto|native|mcp — rounds: 5 — score: 9`
+**Defaults are the strictest configuration.** A bare `/auto-game-in-sleep`
+with no arguments runs everything below at full strictness (full reviews,
+browser testing, unbounded rounds). Each constant below states its own
+default; the em-dash flags only *relax* from that baseline — never assume a
+lenient default.
+
+> 💡 These are defaults. Override by telling the skill, e.g.
+> `/auto-game-in-sleep — review: solo` or `/auto-game-in-sleep fresh —
+> testing: headless`.
 
 - **NO TIME CAP.** This skill imposes no time limit and you must not invent
   one. Run until the pipeline is complete or genuinely blocked. How long that
@@ -98,14 +106,16 @@ Override via arguments: `/auto-game-in-sleep — review: solo — testing: headl
   - `native` — force direct image read. If the host cannot read images, log `blocked` as a hard error; do not silently skip visual checks.
   - `mcp` — force the vision MCP path (e.g. `view_image` / `read_image` tools). If the MCP is absent, log `blocked` as a hard error.
   Vision is **required** — a game without visual verification is not shippable. There is no `none` mode.
-- **REVIEW_MODE = lean** — director review at phase gates (`/gate-check`).
-  `solo` skips gate reviews entirely (fastest, riskiest). `full` adds
-  per-workflow director reviews. Only overrides `production/review-mode.txt`
-  when explicitly passed; otherwise respect the existing file.
-- **MAX_ROUNDS = 5** — cap on adversarial review-loop rounds (see that
-  subsection). The loop also stops early once the score threshold is met.
+- **REVIEW_MODE = full** — strictest: director review per major artifact
+  (`/gate-check`). `lean` runs it once at Polish only; `solo` skips gate
+  reviews entirely (fastest, riskiest — use only when explicitly requested).
+  Only overrides `production/review-mode.txt` when explicitly passed;
+  otherwise respect the existing file.
+- **MAX_ROUNDS = INF** — no cap on adversarial review-loop rounds (see that
+  subsection). The loop stops ONLY on the quality gate (total > 9 AND
+  真实可玩性 ≥ 9). Never invent a round limit.
 - **SCORE_THRESHOLD = 9** — overall score (0–10) that ends the adversarial
-  review loop, combined with the `真实可玩性 ≥ 8` hard gate.
+  review loop, combined with the `真实可玩性 ≥ 9` hard gate.
 - **TESTING = browser** — `browser` = web build + browser-automation playtest
   (rule 2 in full). `headless` = engine headless runs and screenshots only
   (use when no browser tooling exists). Never choose `off`.
@@ -225,7 +235,10 @@ are: the run is genuinely blocked (wrap up) or all steps complete (wrap up).
 The scope of record is the **full / complete tier** declared in
 `design/gdd/game-concept.md` (or, if the concept predates tiers, everything
 the systems index lists as MVP + the content counts in the GDDs). Never
-substitute a smaller game because no one stopped you.
+substitute a smaller game because no one stopped you. **Complete means proven
+in the running build**: every GDD acceptance item MUST have Test Loop evidence
+(screenshot sequence + log) showing it working — a feature "implemented" with
+no evidence is NOT implemented.
 
 - The MVP tier (if defined) is a **milestone on the way** — first playable,
   then keep building. Reaching it is worth a journal entry, not a stop.
@@ -239,10 +252,13 @@ substitute a smaller game because no one stopped you.
 
 ### 5. Run to completion, not to a clock
 
-There is no time budget. Keep working through the pipeline until it is
-complete or genuinely blocked — see Wrap-Up for the only legitimate stop
-conditions. Do not invent a duration limit, and do not treat "the user is
-away" as a reason to rush or cut scope.
+There is no time budget and no round budget. Keep working through the pipeline
+until it is complete or genuinely blocked — see Wrap-Up for the only
+legitimate stop conditions. Do not invent a duration limit, a round cap, or a
+stale cutoff, and do not treat "the user is away" as a reason to rush or cut
+scope. **Complete means evidenced**: every step MUST reach `accepted` with its
+evidence path on file — a step merely executed, tested casually, or declared
+"done" without evidence does NOT count as complete.
 
 One non-negotiable prohibition:
 
@@ -408,7 +424,14 @@ follow its process, with interactive pauses suspended per rule 1.
 
 **Polish**
 26. `/perf-profile`, `/balance-check`, `/asset-audit` → fixes applied
-27. `/playtest-report` ×3 (you are the playtester — see Test Loop checkpoint C: new-player path, core systems, difficulty curve)
+27. Playtest ×3 yourself as the main agent via Skill → `control-browser`
+    (MUST — browser control is main-agent-only and MUST NOT be delegated to a
+    subagent; follow the `web-gui-tester` black-box method: real GUI actions,
+    screenshot + DOM cross-validation per observation, evidence on file).
+    Each session MUST cover: every MVP system to a real outcome (entering a
+    screen is NOT completion), every ending type at least once, and a written
+    playtest report on file. A session without full-system coverage plus all
+    endings is NOT a pass. See Test Loop checkpoint C for the bar.
 28. `/team-polish` → coordinated polish pass
 29. **Adversarial review loop** — independent scored review that drives the
     game to a quality bar (see [The Adversarial Review Loop](#the-adversarial-review-loop)).
@@ -433,7 +456,12 @@ note, and proceed.
 Run at these checkpoints:
 - **A — first playable**: after the vertical-slice moment / first playable build exists
 - **B — every sprint end**: together with `/smoke-check`
-- **C — polish phase**: the 3 playtest sessions
+- **C — polish phase**: the 3 playtest sessions, each played by the main agent
+  itself via Skill → `control-browser` (main-agent-only; MUST NOT delegate to
+  a subagent) following the `web-gui-tester` method. A session PASSES only
+  with full MVP-system coverage, all endings triggered, and the report on
+  file — entering the game is not passing.
+  Checkpoint C is NOT complete until 3 PASS reports exist.
 - **D — before wrap-up**: final verification of the last build
 
 Procedure per checkpoint (commands below are the `ENGINE=Godot`,
@@ -500,7 +528,9 @@ environment is the problem: block and route around.
 
 After the full-tier game is playable and Production is complete, iterate:
 
-1. Run Test Loop checkpoint C as a fresh-eyes playtest. Evaluate against:
+1. Run Test Loop checkpoint C as a fresh-eyes playtest played by the main agent
+   itself (same MUST bar: full MVP-system coverage, all endings, report on
+   file). Evaluate against:
    - every GDD's **Acceptance Criteria** (the real quality bar)
    - game feel: input responsiveness, feedback/juice on core actions, clarity
      of goals, difficulty curve shape
@@ -508,7 +538,8 @@ After the full-tier game is playable and Production is complete, iterate:
 2. List the top 3–5 improvements by player-impact. Implement them.
 3. Re-run the relevant test. Repeat.
 4. **Exit when all true**: all GDD acceptance criteria verified in the running
-   game · latest smoke-check PASS · 3 playtest reports exist · zero open
+   game · latest smoke-check PASS · 3 PASS playtest reports on file (full-system
+   coverage + all endings each) · zero open
    critical/major bugs · 60s continuous browser play with no errors.
 
 **Reviewer independence** — the agent that wrote the code does not accept
@@ -526,15 +557,17 @@ explicit rubric. The implementer's own "looks good to me" is never evidence.
 number of **new findings** (bugs fixed, acceptance criteria newly verified,
 improvements landed — concrete countable events, not "felt productive") in
 `state.json` (`iterations`, `stale_count`). Consecutive zero-finding
-iterations accumulate `stale_count`:
+iterations accumulate `stale_count` (diagnostic only — this loop has no
+stale cutoff either):
 
 - `stale_count ≥ 2` → **forced structural pivot**: the next iteration must
   change the frame, not tune inside it — a different system, or a different
   improvement category (feel / content / UX / audio / performance) than the
   ones already tried. Read the journal's tried directions first and pick one
   that differs.
-- `stale_count ≥ 4` → stop iterating. Wrap up and flag the stuck area in the
-  morning report. Do not keep grinding against a wall.
+- No stop on staleness here either: only full completion (exit criteria above)
+  or genuine impossibility (see Wrap-Up) ends the iteration loop. Do not keep
+  grinding the same frame against a wall — pivot, don't stop.
 
 Avoid thrash: if an iteration makes the test result worse, revert it (keep the
 diff in the journal) and pick a different improvement.
@@ -543,38 +576,63 @@ diff in the journal) and pick a different improvement.
 
 ## The Adversarial Review Loop
 
-A scored, independent challenge loop that pushes the game to a quality bar
+A scored, evidence-gated challenge loop that pushes the game to a quality bar
 before Wrap-Up. It is the studio's equivalent of a cross-model jury: an
-independent reviewer subagent attacks the work, scores it, and forces fixes
-until a threshold — the implementer never acquits its own work.
+independent reviewer subagent scores ONLY what the evidence pack proves, and
+forces fixes until a threshold — the implementer never acquits its own work.
 
 **Gating (`REVIEW_MODE`)**: `solo` skips the loop entirely; `lean` runs it once
 at the Polish step above; `full` runs it per major artifact (per system GDD,
 per sprint, per release gate). When skipped, journal it.
 
+**No round cap in this loop.** `MAX_ROUNDS` does not apply here — the loop
+stops ONLY on the quality gate below or the stale ladder. Rounds are cheap;
+shipping an unverified game is not.
+
 **One reviewer, all dimensions.** Spawn a single fresh-context reviewer
 subagent (e.g. `creative-director` or `qa-lead` — never the agent that wrote the
-code) to score every dimension below and emit 意见 / 建议 / 疑问. Scoring from a
-single rater keeps the dimensions comparable across rounds.
+code) to score every dimension below and emit 意见 / 建议 / 疑问 / 缺件.
+Scoring from a single rater keeps the dimensions comparable across rounds.
 
 **Mechanism per round**
 
-1. **Gather evidence via the debug skill.** The main agent builds the game,
-   launches it, and drives it with `DEBUG_SKILL` (`control-browser`): enter the
-   game, play the core loop, pause/resume, reach a win/lose, capture screenshots,
-   console output, and input→feedback notes. Write the evidence pack to
-   `production/auto-game-in-sleep/test-runs/review-<round>.md`. Real-play
-   dimensions are scored **only** from this pack — never from reading code.
+1. **The main agent builds the evidence pack.** Build the game, launch it, and
+   drive it with `DEBUG_SKILL` (`control-browser`): enter the game, play every
+   MVP system to a real outcome, pause/resume, reach every ending type, capture
+   screenshots, console output, and input→feedback notes. The pack MUST contain:
+   - the three stage logs (`.boot.log` / `.export.log` / `.console.log`,
+     timestamped, from this round's Test Loop run);
+   - screenshots as BEFORE/ACTION/AFTER sequences per item, not single frames:
+     boot (loading → title → first scene), every MVP system (enter → interact
+     → outcome), every ending (approach → trigger → result screen), and
+     pause/resume (gameplay → paused overlay → resumed gameplay). Minimum 3
+     frames per item: a single screenshot proves presence, never motion,
+     feedback, or transition. Static look (界面美观性) may rest on one frame;
+     every dynamic claim MUST have its sequence;
+   - input→feedback notes for the core verb, each note anchored to its
+     sequence (which frames show the feedback).
+   Write the pack to `production/auto-game-in-sleep/test-runs/review-<round>.md`.
+   A pack missing any of the above is NOT sent for review — the round is
+   recorded as FAIL (evidence incomplete) and the next round re-runs the Test
+   Loop first.
 2. **Hand the pack to the reviewer.** Give the subagent: the evidence pack, the
-   GDD acceptance criteria, and the score tables below. For Part A it may also
-   read the GDDs and source in its fresh context; for Part B it scores strictly
-   from the evidence pack.
-3. **The reviewer scores and writes** 意见 / 建议 / 疑问 (formats below). Every
-   dimension score carries a one-line reason anchored to the rubric, so it
-   cannot be handed out arbitrarily.
-4. **The main agent implements the 建议** (prioritized fixes), then the next
-   round begins. Update `state.json`: `iterations`, `stale_count`, and the
-   `adversarial-review` step's `done`/`accepted` + evidence path.
+   GDD acceptance criteria, and the score tables below. The reviewer scores
+   strictly from the pack — never from reading code, never from the main
+   agent's claims. A dynamic claim backed by only one frame = unproven motion:
+   score it as a still, not as gameplay.
+3. **The reviewer scores evidence first, game second.** Completeness of the
+   pack is scored before quality of the game: a normal-looking game with a
+   thin pack scores LOW. Missing ending sequences cap 真实可玩性 at 5;
+   single-frame-only dynamics cap 动态体验 at 5 (motion unproven);
+   missing per-system sequences deduct 完整度 per missing item; missing logs
+   cap 架构与可维护性 at 5 (unverifiable build). Every dimension score carries
+   a one-line reason anchored to the rubric PLUS the evidence path it rests on
+   (screenshot/log path or "no evidence").
+4. **The reviewer also writes the 缺件清单** — exactly what evidence is
+   missing and what to capture next round. The main agent fixes games AND
+   packs: next round re-runs the Test Loop to fill the gaps first, then
+   implements the 建议. Update `state.json`: `iterations`, `stale_count`, and
+   the `adversarial-review` step's `done`/`accepted` + evidence path.
 
 **Scoring — two parts, six dimensions (each 0–10)**
 
@@ -586,7 +644,9 @@ Part A — design & implementation (static; from GDD + source)
 | 新颖性 | cliché clone, no identity | competent but familiar | clear original turn on a known genre | genuinely novel core loop |
 | 架构与可维护性 | spaghetti, no structure | follows basic conventions, some smells | clean, follows `.zcode/rules` | exemplary, easy to extend |
 
-Part B — artifact (dynamic; scored **only** from the `DEBUG_SKILL` evidence pack)
+Part B — artifact (dynamic; scored **only** from the evidence pack, and capped
+by its completeness — a claim without a backing screenshot/log scores as if
+unproven, no matter how normal the game looks)
 
 | Dimension | 0 | 5 | 8 | 10 | source |
 |-----------|---|---|---|----|--------|
@@ -600,31 +660,40 @@ static look — the three are orthogonal.
 **Aggregate & termination**
 
 - **总分 = mean of the 6 dimension scores.**
-- **Hard gate**: while `真实可玩性 < 8`, the loop MUST NOT stop — a 9/10 average
-  that can't even enter the game is never accepted.
-- **Stop when**: `总分 > SCORE_THRESHOLD (9)` **and** `真实可玩性 ≥ 8`, **or**
-  `iterations > MAX_ROUNDS (5)`.
+- **Hard gate**: while `真实可玩性 < 9`, the loop MUST NOT stop — a high average
+  that can't prove full playability from evidence is never accepted.
+- **Stop when**: `总分 > SCORE_THRESHOLD (9)` **and** `真实可玩性 ≥ 9`.
+  No round cap applies to this loop (`MAX_ROUNDS = INF`).
+- **Stale counter (this loop, count-only, never stops)**: a round with zero new
+  findings increments `stale_count` for diagnostics; at ≥10 the round MUST
+  change review angle (different dimension focus, different play path) but the
+  loop continues. The generic iteration-loop ladder (≥2 pivot / ≥4 stop) does
+  NOT govern this loop. Only the quality gate above — or genuine impossibility
+  (see Wrap-Up) — ends the loop.
 - On stop, record the final scores in the `adversarial-review` step as
   `accepted` (with the evidence pack path) and carry them into the morning
   report's Quality bars section.
 
 **Outputs per round (the reviewer writes)**
 
-- **意见** — per-dimension score + one-line reason; what works, what doesn't.
+- **意见** — per-dimension score + one-line reason + backing evidence path (or
+  "no evidence"); what works, what doesn't.
 - **建议** — concrete, prioritized fixes; each tied to a dimension; mark which
   are the minimum to clear the threshold.
 - **疑问** — things the reviewer cannot resolve from evidence (e.g. "is X
   intended or a bug?"). If a 疑问 blocks acceptance, log it to the blocked list
   / morning report for the human.
+- **缺件清单** — exactly which evidence is missing (screenshots/logs/notes per
+  system or ending) and what the main agent MUST capture next round before any
+  game fix counts.
 
 **Reuses (no new machinery)**
 
 - *done≠accepted* — the loop step is `accepted` only with the score + evidence
   pack on file; "I fixed it" is not evidence.
-- *stale ladder* — a round with zero new findings increments `stale_count`;
-  ≥2 forces a different review angle next round; ≥4 stops the loop and wraps up.
 - *reviewer independence* — fresh subagent, never the implementer; scores from
-  evidence (Part B) / fresh read (Part A), not its own memory.
+  the evidence pack only, never from its own memory or from reading code for
+  the main agent's benefit.
 
 ## Wrap-Up
 
