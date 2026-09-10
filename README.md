@@ -186,6 +186,8 @@ Notes:
   the plugin enabled in all your other projects is safe.
 - The plugin runs from ZCode's cache copy. After editing scripts under
   `ccgs-studio-hooks/hooks/`, refresh/update the plugin for changes to apply.
+- Full per-hook logic, events, exit codes, and known issues are documented in
+  [`ccgs-studio-hooks/HOOKS.md`](ccgs-studio-hooks/HOOKS.md).
 
 ## Upgrading
 
@@ -296,8 +298,10 @@ every step).
 
 **Hooks** ship as the optional [`ccgs-studio-hooks`](#optional-install-the-studio-hooks-plugin)
 plugin (see Getting Started for installation). Declared in full Claude Code
-plugin spec — hosts run what they support: ZCode runs 10 hooks across 5 events
-(and ignores `PreCompact`/`Notification` entries), Claude Code runs all 12:
+plugin spec — hosts run what they support: ZCode runs 12 handlers across 5 events
+(and ignores `PreCompact`/`Notification` entries), Claude Code runs all 14:
+see [`ccgs-studio-hooks/HOOKS.md`](ccgs-studio-hooks/HOOKS.md) for the full per-hook
+reference.
 
 | Hook | Trigger | What It Does |
 |------|---------|--------------|
