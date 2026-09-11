@@ -264,19 +264,20 @@ or genuinely blocked, in the background while you are not at the keyboard):
 - **The game builds the full scope, not a demo** — the target is the complete
   tier from the game concept; a minimal version is a milestone on the way, never
   the destination.
-- **It plays its own game** — web builds are served locally and driven with a
-  browser-automation skill (e.g. `control-browser`): boot, core loop, menus, game over,
-  console errors, screenshots — feeding real bugs back into the sprint loop.
+- **It plays its own game** — the build runs locally and is driven with real input
+  through a scripted input seam: boot, core loop, menus, game over, runtime errors,
+  frame-sequence captures — feeding real bugs back into the sprint loop. No browser
+  is required; shipping a browser build is a separate concern (`/web-export`).
 - **Produces art per `ART_METHOD`** — `svg` by default: writes AI prompts for
   later human upgrade, draws the art as SVG, rasterizes it to PNG for visual
   checking (model or vision MCP), converts to an engine asset only if the format
   isn't already PNG/JPG/SVG, then iterates the SVG (no image model needed; ships
   real vector-derived art). `generate` instead calls an image tool for model-produced art.
-- **Runs an adversarial review loop** — an independent reviewer subagent scores
-  the game on six dimensions (completeness / novelty / architecture from code;
-  real playability / UI aesthetics / game feel from actual `control-browser`
-  playthrough), forces fixes, and only stops at `总分 > 9` with `真实可玩性 ≥ 8`
-  or after `MAX_ROUNDS = 5`. Gated by `REVIEW_MODE` (`solo` skips).
+- **Runs an adversarial review loop** — an independent reviewer subagent *runs the
+  build itself* and scores the game on six dimensions (completeness / novelty /
+  architecture from code; real playability / UI aesthetics / game feel from its own
+  playthrough), then forces fixes. It stops only at `总分 > 9` with `真实可玩性 ≥ 9`
+  — there is no round cap. Gated by `REVIEW_MODE` (`solo` skips).
 - **It iterates until good** — playtest → top improvements → re-test, until all
   GDD acceptance criteria pass, smoke check passes, and 3 playtest reports exist.
   Quality verdicts come from independent reviewer subagents, never from the agent

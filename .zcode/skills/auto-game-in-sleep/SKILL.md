@@ -1,7 +1,7 @@
 ---
 name: auto-game-in-sleep
-description: "Fully autonomous unattended game production run (auto-game-in-sleep — 'make the game while you're not at the keyboard'). Chains every studio workflow from concept to polished game, makes all decisions on the user's behalf (logged for audit), tests the running game itself via web export + browser automation, iterates until quality bars are met, and leaves a report for when you return. Game languages (array) and project-doc language are configurable. Use when the user wants a hands-off / non-interactive / fully automatic run — e.g. 'auto-game-in-sleep', 'autopilot', 'run the whole pipeline yourself', '睡一觉醒来游戏做好', '一晚上自动做完游戏', '不要问我，全部自己决定'."
-argument-hint: "[resume | fresh] [— review: solo|lean|full] [— testing: browser|headless] [— game-lang: 简体中文,English] [— docs-lang: 简体中文] [— engine: Godot] [— target: Web] [— debug: control-browser] [— art: svg] [— vision: auto|native|mcp] [— rounds: 5] [— score: 9]"
+description: "Fully autonomous unattended game production run (auto-game-in-sleep — 'make the game while you're not at the keyboard'). Chains every studio workflow from concept to polished game, makes all decisions on the user's behalf (logged for audit), tests the running game itself on the local build, iterates until quality bars are met, and leaves a report for when you return. Game languages (array) and project-doc language are configurable. Use when the user wants a hands-off / non-interactive / fully automatic run — e.g. 'auto-game-in-sleep', 'autopilot', 'run the whole pipeline yourself', '睡一觉醒来游戏做好', '一晚上自动做完游戏', '不要问我，全部自己决定'."
+argument-hint: "[resume | fresh] [— review: solo|lean|full] [— testing: native|headless] [— game-lang: 简体中文,English] [— docs-lang: 简体中文] [— engine: Godot] [— target: Desktop,Web] [— debug: native] [— dim: 2D|3D|both] [— dev-lang: GDScript|C#|both] [— input: keyboard+touch] [— perf: none|defaults] [— art: svg] [— vision: auto|native|mcp] [— score: 9]"
 user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, TodoWrite, Agent, Skill
 ---
@@ -28,7 +28,7 @@ quality bars, artifact paths) applies unchanged.
 - `production/auto-game-in-sleep/state.json` — resumable run state + heartbeat
 - `production/auto-game-in-sleep/decisions.md` — append-only decision log (the user audits this)
 - `production/auto-game-in-sleep/journal.md` — timestamped, self-contained progress journal
-- `production/auto-game-in-sleep/test-runs/` — build logs, screenshots, browser test notes
+- `production/auto-game-in-sleep/test-runs/` — run logs, frame captures, test notes
 - `production/auto-game-in-sleep/morning-report.md` — the report for when the user returns (what was built, how to run it, what to do next)
 
 ---
@@ -37,7 +37,7 @@ quality bars, artifact paths) applies unchanged.
 
 **Defaults are the strictest configuration.** A bare `/auto-game-in-sleep`
 with no arguments runs everything below at full strictness (full reviews,
-browser testing, unbounded rounds). Each constant below states its own
+native testing, unbounded rounds). Each constant below states its own
 default; the em-dash flags only *relax* from that baseline — never assume a
 lenient default.
 
@@ -66,27 +66,102 @@ lenient default.
   default; when `ENGINE` is overridden with another engine, it no longer
   applies. Passed to `/setup-engine`. If an engine is already configured in
   `.zcode/docs/technical-preferences.md`, the run respects it; otherwise it
-  configures `ENGINE`. Godot is the default because its web export is the
-  cleanest path for the default `PREFERRED_TARGET`.
-- **⚠️ GODOT + 中文必备字体** — When `ENGINE == Godot` and `GAME_LANGS` includes `简体中文` (or any CJK), the Web build MUST bundle a CJK-capable font from the host machine and use it in the project (e.g. `DynamicFont`/`Theme`/`FontFile` and ensure it is exported with the Web preset). Without this, Godot Web renders Chinese as unreadable tofu/mojibake (four small boxes/digits crammed together, etc.). Look up the latest Godot 4 tutorial for "Godot CJK font setup" and follow it. **This is a blocking requirement — do not mark `setup-engine` as `accepted` until the Web test run shows Chinese text renders correctly without tofu.**
-- **PREFERRED_TARGET = Web** — the primary shipped artifact. The run builds and
-  verifies toward this target (for `Web`, the Test Loop serves a web build and
-  drives it in a browser). Adapt the build path and verification when this is a
-  desktop or other target.
-- **DEBUG_SKILL = control-browser** — the browser-automation skill used to play
-  and observe the running game in the Test Loop. Load its own guide first if it
-  ships one. Falls back to any other browser tooling, then to headless checks,
-  if unavailable.
+  configures `ENGINE`. Godot is the default because its 2D pipeline, headless
+  mode, and export tooling give the fastest unattended iteration.
+- **Web delivery is out of scope for this pipeline.** Producing a browser build,
+  and the font packaging a browser build may require, belongs to the standalone
+  `/web-export` skill. This pipeline targets a build that runs on the local
+  machine: it does not bundle browser-specific assets, serve a web build, or
+  verify one. When the user wants a Web build, run `/web-export` after this
+  pipeline finishes.
+- **TARGET_PLATFORMS = [Desktop, Web]** — the platforms this game ships on.
+  Element `[0]` is the **primary** platform: it is what every build and
+  verification step in this pipeline targets, and the local machine is both the
+  development and the verification environment. Later entries are **export
+  targets** — the project must stay exportable to them (no desktop-only
+  assumptions baked into gameplay code), but this pipeline does not build or
+  verify them. Browser packaging, and the font work a browser build may need,
+  belongs to `/web-export`. Passed to `/setup-engine` as the platform answer.
+  **The `Web` entry includes mobile browsers** — the game must be playable on a
+  phone browser, so the Web export is a genuinely supported surface, not a
+  courtesy build: touch-playable, correctly scaled at phone aspect ratios, and
+  small enough for a phone to realistically download. Verifying it means testing
+  at a **phone viewport with touch**, not only in a desktop browser window.
+- **DIMENSION = 2D** — `2D` | `3D` | `both`. Decides the engine's scene and
+  render setup, the art pipeline, and what a performance profile even means.
+  Passed to `/setup-engine` as the "what kind of game" answer.
+  **Consistency check:** `3D` or `both` is **incompatible** with
+  `ART_METHOD = svg` — an SVG→PNG sprite pipeline is 2D-only. If the two
+  conflict, stop and resolve it before building anything; never produce a
+  mismatched pipeline silently.
+- **DEV_LANGUAGE = GDScript** — the language the game is written in. For
+  `ENGINE == Godot`: `GDScript` | `C#` | `both`. Default `GDScript` — it is
+  Godot-native, iterates fastest, and needs no .NET SDK, which keeps an
+  unattended run simple (`both` is an advanced setup requiring the .NET SDK
+  alongside Godot). For non-Godot engines use that engine's primary language
+  (Unity → C#, Unreal → C++/Blueprint) and record it.
+  `/setup-engine` normally **blocks** on this question — it asks which language
+  to use *before* showing the proposed Technology Stack — but an engine argument
+  skips that, so this constant is the answer. **The choice propagates widely:**
+  it sets the coding standards, naming conventions, specialist-agent routing and
+  file-extension routing in `technical-preferences.md`, and it determines which
+  test framework is even usable (GUT is GDScript-only). Choose once, record it,
+  and keep every later step consistent with it.
+- **PHYSICS_BACKEND = jolt** — which physics backend to configure. When
+  `ENGINE == Godot` and the game is `3D` or `both`, use **Jolt** (Godot's default
+  3D physics since 4.6). For a pure-2D project the choice does not arise —
+  Godot's 2D physics is separate — but **record that fact in
+  `technical-preferences.md` instead of leaving the field blank**. For non-Godot
+  engines use the engine's own default. Either way the value is recorded, never
+  left as `[TO BE CONFIGURED]`.
+- **PRIMARY_INPUT = keyboard+touch** — the dominant input method(s), passed to
+  `/setup-engine` as given. **This is a constraint, not a label:** with
+  keyboard+touch as primary, no core mechanic may require a mouse — a
+  cursor-driven verb (drag, aim, place-at-pointer) is out of spec and must be
+  redesigned, or this constant overridden. Gamepad support is not set here;
+  derive it from `TARGET_PLATFORMS` using `/setup-engine`'s own mapping table.
+- **TOUCH_SUPPORT = full** — whether the game is fully playable by touch. `full`
+  whenever touch is a primary input; otherwise `partial` or `none`.
+- **PERF_BUDGET = none** — whether this run imposes performance budgets
+  (framerate target, frame budget, draw calls, memory ceiling). `none` (default)
+  imposes no budget and assumes no upper bound on the player's hardware: do not
+  design around, cut content for, or gate any step on performance. `defaults`
+  writes `/setup-engine`'s standard budgets and treats them as goals.
+  **`none` does not mean "never measure".** A game that visibly stutters is
+  still a defect — it is a bug to fix, not a budget to miss. Keep performance
+  evidence in the Test Loop either way; just never let a budget block the run.
+  **Conflict to watch:** when `TARGET_PLATFORMS` includes `Web` and mobile
+  browsers are in scope, the weakest supported target is a phone — so "no
+  budget" **cannot** mean "never checked on a phone". At minimum, observe the
+  game on a phone-class viewport/device and confirm it is not unplayable; if it
+  is, that is a bug to fix under the debug discipline, not an accepted
+  trade-off.
+- **RUN_MODE = native** — how the running game is driven and observed. `native`
+  = run the built game on the local machine (a window is fine; it may flash
+  briefly). Logic and balance are verified by headless assertion runs; visuals
+  and feel by native frame capture. **No browser and no browser-automation skill
+  is required by this pipeline.**
+- **NATIVE_CAPTURE = movie** — how visual evidence is produced: run the game
+  windowed with frame-sequence recording (Godot: `--write-movie <dir>/frame.png
+  --fixed-fps <n> --quit-after <frames>`). Frames land on disk directly, with no
+  tiling artifacts and no base64 round-trip. **A headless run cannot capture
+  frames** — it uses a dummy renderer — so capture always needs a real window.
 - **ART_METHOD = svg** — how art assets are actually produced. Default is a
   self-contained, no-image-model pipeline:
   - `svg` (default) — for each asset spec: (1) keep the AI-generation prompt in
-    the spec for later human upgrade; (2) author the art as **SVG** (text the
-    agent can write and iterate directly); (3) **rasterize** the SVG to PNG/JPG
-    at the spec's dimensions — **prefer browser screenshots**: serve the file
-    locally (`python -m http.server`) and capture with `DEBUG_SKILL` (`control-browser`)
-    at the spec’s width/height; the screenshot is both the raster and the visual check
-    artifact. Fall back to `cairosvg` / `rsvg-convert` / `Inkscape` only when the
-    browser is unavailable.  (4) **convert to an engine asset** — only
+    the spec for later human upgrade; (2) **delegate the drawing to the
+    `svg-artist` subagent** — the main agent must not hand-author art. Invoke it
+    like a drawing engine by passing **the prompt file's path** (plus the art
+    bible path and an optional reference-image path) and nothing else: the agent
+    reads the prompt itself and derives its output location from the
+    prompt's directory and basename (the SVG and the raster land beside the
+    prompt), running its own draw → rasterize → look → fix
+    loop.
+    **The prompt path must already exist** — produce it with `/asset-spec` first;
+    a missing prompt file is a hard error, never a licence to draw anyway; (3) **rasterize** the SVG to PNG/JPG
+    at the spec's dimensions with a **local** SVG rasterizer (e.g. a Python SVG
+    library, `rsvg-convert`, or `Inkscape`). Rasterization is a local build step
+    and must not depend on a browser.  (4) **convert to an engine asset** — only
     if the format isn't already PNG/JPG/SVG (most engines, e.g. Godot, import those natively, so
     usually skip this step; convert only when the engine needs a specialized
     texture/atlas format); (5) **visually check** the raster per `VISION`
@@ -102,7 +177,7 @@ lenient default.
     `Done`. Use this when a real image model is wired in and you want
     model-produced art over vector art.
 - **VISION = auto|native|mcp** — how the run sees images. Do not let the model guess. The value here is the authority; there is no "if it has vision" self-test.
-  - `auto` (default) — probe once at startup: try native image read first (direct `Read` of image files / `control-browser` screenshots); if unavailable, try the vision MCP. If neither exists, this is a **blocking** error — log `blocked` and stop the art/playtest sub-flow; do not degrade silently.
+  - `auto` (default) — probe once at startup: try native image read first (direct `Read` of image files / captured frames); if unavailable, try the vision MCP. If neither exists, this is a **blocking** error — log `blocked` and stop the art/playtest sub-flow; do not degrade silently.
   - `native` — force direct image read. If the host cannot read images, log `blocked` as a hard error; do not silently skip visual checks.
   - `mcp` — force the vision MCP path (e.g. `view_image` / `read_image` tools). If the MCP is absent, log `blocked` as a hard error.
   Vision is **required** — a game without visual verification is not shippable. There is no `none` mode.
@@ -116,9 +191,9 @@ lenient default.
   真实可玩性 ≥ 9). Never invent a round limit.
 - **SCORE_THRESHOLD = 9** — overall score (0–10) that ends the adversarial
   review loop, combined with the `真实可玩性 ≥ 9` hard gate.
-- **TESTING = browser** — `browser` = web build + browser-automation playtest
-  (rule 2 in full). `headless` = engine headless runs and screenshots only
-  (use when no browser tooling exists). Never choose `off`.
+- **TESTING = native** — `native` = run the built game on the local machine and
+  capture evidence from it (rule 2 in full), backed by headless assertion runs
+  for logic. Never choose `off`.
 - **RESUME = auto** — resume an interrupted run when state exists; `fresh`
   forces a new run; `resume` forces continuing.
 
@@ -214,12 +289,9 @@ You have no user. Every point where a workflow skill says *"use AskUserQuestion"
 ### 2. Test the running game yourself
 
 "Code compiles" is not "the game works". At every checkpoint listed in the
-Test Loop below, you produce a build, run it, and observe it — through a
-browser when the engine exports to web (Godot does; Unity WebGL does), via
-headless runs and engine screenshots otherwise. Use the debug skill
-`DEBUG_SKILL` (default `control-browser`) to play and observe the build; fall
-back to any other browser tooling, then to headless-only checks. Details in
-**The Test Loop**.
+Test Loop below, you produce a build, run it on the local machine, and observe
+it yourself — logic via headless assertion runs, visuals and feel via native
+frame capture. No browser is involved. Details in **The Test Loop**.
 
 ### 3. Chain the pipeline — never stop between workflows
 
@@ -268,7 +340,7 @@ One non-negotiable prohibition:
 
 Blocked items never stop the run: if a single problem survives the debug
 discipline (see Test Loop), or a required external resource is missing
-(engine binary, export templates, browser tooling), record it in the
+(engine binary, export templates), record it in the
 **Blocked List** in `state.json`, apply the best fallback, and keep moving.
 Only wrap up early when progress is genuinely impossible — and say so honestly.
 
@@ -362,8 +434,9 @@ order and the repeat rules). Invoke each step's skill via the Skill tool and
 follow its process, with interactive pauses suspended per rule 1.
 
 **Concept**
-1. `/setup-engine [ENGINE]` → `.zcode/docs/technical-preferences.md` names a real engine. When none is configured, configure `ENGINE` (default Godot); if one is already set, respect it. Target `PREFERRED_TARGET` (default Web) — Godot+Web is the cleanest export path, which is why both default there.
-   Acceptance: if `ENGINE == Godot` and `GAME_LANGS` includes CJK (简体中文/繁體中文/日本語/한국어), verify a CJK-capable font is bundled, assigned via `Theme`/`DynamicFont`/`FontFile`, exported with the Web preset, and the Web smoke run renders Chinese without tofu/mojibake before marking the step `accepted`.
+1. `/setup-engine [ENGINE]` → `.zcode/docs/technical-preferences.md` names a real engine. When none is configured, configure `ENGINE` (default Godot); if one is already set, respect it.
+   **Passing an engine argument skips `/setup-engine`'s guided questions, so this run must supply those answers explicitly** — `TARGET_PLATFORMS` (platform), `DIMENSION` (2D/3D/both), `DEV_LANGUAGE`, `PHYSICS_BACKEND`, `PRIMARY_INPUT`, `TOUCH_SUPPORT` and `PERF_BUDGET` — and let `/setup-engine` derive gamepad support from the platform with its own mapping table.
+   Acceptance: `technical-preferences.md` names a real engine, records **all** of the above plus a concrete `Rendering` and `Physics` entry, and the local build boots. **A `[TO BE CONFIGURED]` left in Engine & Language or Input & Platform is a failure of this step** — nothing later in the pipeline will fill it. Font packaging for a browser build is **not** verified here; that belongs to `/web-export`.
 2. Concept document exists (done in bootstrap, or `/brainstorm` for an existing vague project) → `design/gdd/game-concept.md`
 3. `/design-review design/gdd/game-concept.md` → fix issues it can fix itself; log anything arguable
 4. `/art-bible` → `design/art/art-bible.md`
@@ -384,16 +457,78 @@ follow its process, with interactive pauses suspended per rule 1.
 
 **Pre-Production**
 15. `/asset-spec` inventory + per-asset specs → `design/assets/entity-inventory.md`, `asset-manifest.md` (skip if visually trivial — journal the skip)
+    **Pipeline addition to this step:** beyond what `/asset-spec` produces on its
+    own, **this run also writes each visual asset's generation prompt as its own
+    file**, `<basename>.prompt.md`, in the directory where that asset's art will
+    live. The spec and the manifest record that **path**, never a second copy of
+    the text, so the two cannot drift apart. Audio assets are exempt —
+    descriptions, not prompts.
 
-    **Asset production** (driven by `ART_METHOD`, after specs exist):
-    - `svg` (default) — keep each spec's AI prompt for later human upgrade;
-      author the art as SVG, then:
-      1. **Rasterize** the SVG to PNG/JPG at the spec's dimensions — **prefer
-         browser screenshots**: serve the SVG locally and capture with
-         `DEBUG_SKILL` (`control-browser`) at the spec’s dimensions; the
-         screenshot is both the raster and the visual-check artifact. Fall back
-         to `cairosvg` / `rsvg-convert` / `Inkscape` only when the browser is
-         unavailable.
+16. `/ux-design` for ≥3 key screens (main menu, gameplay HUD, pause) → `design/ux/*.md`
+    **Pipeline addition to this step:** every screen's UX spec must carry a
+    **surface inventory** — each visible surface it draws (background, panels,
+    frames, dividers, decorative elements, emblems) together with the asset that
+    backs it. A surface with no backing asset is either promoted into the asset
+    list or explicitly declared per-frame; a surface promoted here gets its own
+    `<basename>.prompt.md` at this step, exactly like the step 15 assets, so the
+    batch below can produce it. This is what gets art into the manifest *before*
+    production, so it cannot be forgotten downstream; a screen that declares no
+    surfaces is an incomplete spec, not a simple screen. This inventory is part
+    of the **opening batch**, not a closed contract — later steps are expected
+    to extend it (see the empowerment clause under Asset production).
+17. `/ux-review` → issues fixed
+
+    **Asset production** (driven by `ART_METHOD`) — runs **after `/ux-review`**,
+    so the opening batch is built last among the pre-production art steps: it
+    covers the entity assets specified at step 15 **and** the screen surfaces
+    promoted at step 16. Producing it before step 16 would structurally
+    guarantee that menus, HUD chrome and other screen surfaces are missing from
+    the batch — the exact gap this pipeline exists to remove.
+
+    **Default for every visible surface: it is an asset.** Unless a thing is
+    generated per-frame from simulation state, its pixels must come from a file
+    this pipeline produced. A menu or results background, a panel, a frame, a
+    divider, a title, a decoration and an ending illustration are assets exactly
+    as a sprite is. Code may transform an asset — move, scale, fade, tint,
+    rotate — but code may not be the reason the pixels exist. The one standing
+    exception is the per-frame family: particles, force-field rings, trails,
+    screen shake, damage numbers. Using code **outside** that family requires a
+    stated reason in the run journal; it is never a silent default — and a
+    recorded reason is **sufficient** (see the 界面美观性 cap in The Adversarial
+    Review Loop: a recorded reason excludes that surface from the coverage
+    ratio, with no further adjudication).
+
+    **The opening asset list is a starting point, not a ceiling — downstream has
+    standing authority to add art.** Whenever any later step (a production
+    story, `/team-polish`, a playtest, the adversarial review, or simply
+    noticing a bare surface) finds something that wants art and does not have
+    it, that step **adds the asset itself, following exactly the same
+    `ART_METHOD` path the opening batch used** — never invent a second pipeline
+    for late additions:
+    - `svg` — write the asset's `<basename>.prompt.md`, draw it via the
+      `svg-artist` subagent, rasterize locally, visually check;
+    - `generate` — run the new asset's prompt through the same image tool/MCP
+      the opening batch used.
+    Then record it in the manifest like any other asset. **No permission is
+    required and the original list is not a limit.** Adding art is never "scope
+    creep" here; it is the point of the run. Conversely, a step must not skip art
+    because "it wasn't in the inventory" — an incomplete list is an invitation
+    to extend it, not a licence to leave a surface bare.
+    - `svg` (default) — each asset keeps an AI prompt at
+      `<basename>.prompt.md`, **produced by this run as its own file** — at
+      step 15 for entity assets, at step 16 for the screen surfaces the UX
+      inventories promote, in the same directory as the art it describes. The manifest records the
+      prompt's *path*, not its text, so the two cannot drift. The prompt is a
+      prerequisite for drawing, not an afterthought:
+      **draw via the `svg-artist` subagent**, invoked per asset like a drawing
+      engine — pass the **prompt file path** (not the prompt text), the art
+      bible path, and an optional reference image; the agent derives its output
+      from the basename (source and raster beside the prompt).
+      Then:
+      1. **Rasterize** the SVG to PNG/JPG at the spec's dimensions with a
+         **local** SVG rasterizer (e.g. a Python SVG library, `rsvg-convert`,
+         or `Inkscape`). The raster is also the visual-check artifact.
+         Rasterization is a local build step and must not depend on a browser.
       2. **Convert to an engine asset** — only if the format isn't already
          PNG/JPG/SVG (most engines, e.g. Godot, import those natively, so usually omit this step;
          convert only when the engine needs a specialized texture/atlas format).
@@ -404,8 +539,7 @@ follow its process, with interactive pauses suspended per rule 1.
     - `generate` — run each spec's prompt through an image-generation tool/MCP,
       write the result into `assets/`, then `/asset-audit` and advance the
       manifest to `Done`.
-16. `/ux-design` for ≥3 key screens (main menu, gameplay HUD, pause) → `design/ux/*.md`
-17. `/ux-review` → issues fixed
+
 18. Prototype: only if the core mechanic is genuinely high-risk (journal the decision either way)
 19. `/create-epics layer: foundation`, then `layer: core` (+ feature layers) → `production/epics/*/EPIC.md`
 20. `/create-stories [epic]` per epic → story files
@@ -424,10 +558,19 @@ follow its process, with interactive pauses suspended per rule 1.
 
 **Polish**
 26. `/perf-profile`, `/balance-check`, `/asset-audit` → fixes applied
-27. Playtest ×3 yourself as the main agent via Skill → `control-browser`
-    (MUST — browser control is main-agent-only and MUST NOT be delegated to a
-    subagent; follow the `web-gui-tester` black-box method: real GUI actions,
-    screenshot + DOM cross-validation per observation, evidence on file).
+    **Pipeline addition to this step — art completeness.** `/asset-audit` does
+    not check this by itself, so verify it here: every **visual** asset in the
+    manifest must have its prompt at `<basename>.prompt.md` **and** whatever
+    raster `ART_METHOD` produces, in the same directory — for `svg` that is the
+    pair `<basename>.svg` + `<basename>.png`; for `generate` it is the prompt
+    plus the generated raster. A missing prompt is a
+    **non-compliance, not a warning** — it is the only record a human can use to
+    regenerate the asset later, and the prerequisite handed to the asset
+    producer. Report the count and list every offender.
+27. Playtest ×3 yourself as the main agent against the locally running build
+    (MUST be done by the main agent itself, driven with real input through the
+    scripted input seam; follow a real-input black-box method — perform actual
+    actions, capture a frame sequence per observation, evidence on file).
     Each session MUST cover: every MVP system to a real outcome (entering a
     screen is NOT completion), every ending type at least once, and a written
     playtest report on file. A session without full-system coverage plus all
@@ -457,57 +600,55 @@ Run at these checkpoints:
 - **A — first playable**: after the vertical-slice moment / first playable build exists
 - **B — every sprint end**: together with `/smoke-check`
 - **C — polish phase**: the 3 playtest sessions, each played by the main agent
-  itself via Skill → `control-browser` (main-agent-only; MUST NOT delegate to
-  a subagent) following the `web-gui-tester` method. A session PASSES only
-  with full MVP-system coverage, all endings triggered, and the report on
-  file — entering the game is not passing.
+  itself against the locally running build. A session PASSES only with full
+  MVP-system coverage, all endings triggered, and the report on file —
+  entering the game is not passing.
+  Sessions must reach late content by **natural progression**, never by
+  teleporting game state. A state-jump is acceptable only to inspect one
+  specific late-game feature, and must be labelled as such in the report.
   Checkpoint C is NOT complete until 3 PASS reports exist.
 - **D — before wrap-up**: final verification of the last build
 
-Procedure per checkpoint (commands below are the `ENGINE=Godot`,
-`PREFERRED_TARGET=Web` path; adapt the engine binary and export target when
-either differs):
+Procedure per checkpoint (the `ENGINE=Godot`, `TARGET_PLATFORMS[0]=Desktop` path;
+adapt the engine binary when it differs):
 
 1. **Headless boot smoke** — catches script/runtime errors cheaply:
    `godot --headless --path . --quit-after 300` (300 frames). Any error or
    script failure in output = bug. Fix before continuing.
-   Redirect output to a timestamped log: `test-runs/<checkpoint>-<YYYYMMDD-HHMMSS>.boot.log`
-   (e.g. `checkpoint-B-20260904-120500.boot.log`); judge state by reading the log tail.
-2. **Web build** — ensure `export_presets.cfg` has a Web preset (create it if
-   missing), then `godot --headless --path . --export-release "Web" ../build/web/index.html`,
-   with output redirected to `test-runs/<checkpoint>-<YYYYMMDD-HHMMSS>.export.log`.
-   If export templates are missing: try installing them; if that fails, log
-   blocked + fall back to headless checks and engine screenshots.
-3. **Serve** — serve `build/web` locally. Pick the port by probing upward from
-   8600: use the first free port (`test_server_port`, recorded in `state.json`
-   so the whole checkpoint reads the same value). Example:
-   `python -m http.server <test_server_port> --directory build/web` in the
-   background (kill it at checkpoint end). Never hardcode 8600 — a stale server
-   from a previous run may still hold it.
-4. **Play it** — drive the running build with the debug skill `DEBUG_SKILL`
-   (default `control-browser`; load its guide first if it ships one). Open
-   `http://localhost:<test_server_port>` (the probed port from step 3, not a
-   hardcoded value). If
-   `DEBUG_SKILL` is unavailable, fall back to any other browser-automation
-   tooling, then to headless-only checks:
-   - open the served URL, wait for load, screenshot
-   - read console errors — any error counts as a bug; save console output to
-     `test-runs/<checkpoint>-<YYYYMMDD-HHMMSS>.console.log`
-   - actually play the core loop: send input (keys/clicks), screenshot after
-     each meaningful action, verify expected feedback (movement, score, state
-     change, menu transitions)
-   - exercise: boot → new game → core loop ≥60s → pause → resume →
-     game over/win → restart
+   Redirect output to a timestamped log: `test-runs/<checkpoint>-<YYYYMMDD-HHMMSS>.boot.log`;
+   judge state by reading the log tail.
+2. **Headless assertion run** — the project's own logic tests must pass, and they
+   must include a **scene-load smoke**: assert that the rendering scenes load,
+   instantiate, and their scripts compile. Assertions that only drive pure-logic
+   objects will not catch a parse error in a rendering script — and such an error
+   can survive all the way into a shipped build.
+3. **Build** — build the desktop target, output redirected to
+   `test-runs/<checkpoint>-<YYYYMMDD-HHMMSS>.export.log`.
+4. **Play it — natively, with scripted input.** Unattended play must be
+   reproducible, so the game needs a **scripted input seam** (a flag making the
+   game read input from a script rather than the OS); synthesized OS input is
+   fragile and depends on window focus. Then:
+   - run windowed with **frame-sequence capture** and a **fixed timestep that is
+     decoupled from wall-clock time** (Godot: `--fixed-fps <n> --disable-vsync`,
+     optionally `--write-movie <dir>/frame.png --quit-after <frames>`).
+     Decoupling is essential: with real-time pacing the game keeps running while
+     you think between tool calls, which silently invalidates observations —
+     "the player died in 12 seconds" may only mean nobody was playing.
+   - drive the core loop: enter the game, exercise every MVP system to a real
+     outcome, pause/resume, reach every ending, restart
+   - capture a **frame sequence** per item (before / action / after — one frame
+     proves presence, never transition), plus the run log
+   - a headless run **cannot** produce frames (it uses a dummy renderer);
+     visuals require a window
 5. **Record** — write `production/auto-game-in-sleep/test-runs/<checkpoint>-<date>.md`
-   with screenshots, console output, what worked, bug list. File bugs via
-   `/bug-report` (they feed the Production loop) or fix trivial ones immediately.
+   with frame paths, logs, what worked, bug list. File bugs via `/bug-report`
+   (they feed the Production loop) or fix trivial ones immediately.
 6. **Re-test after fixes** — a checkpoint only passes when a clean run has
-   zero console errors and the core loop completes.
+   zero errors in the logs and the core loop completes.
 
-Fallback ladder when browser automation is unavailable: engine screenshots
-(Godot movie-maker mode / viewport capture script) + headless run logs +
-unit tests. State plainly in the test record which level of verification was
-achieved.
+Fallback ladder when the engine binary is unavailable: headless assertion runs +
+engine screenshots are the only level available — state plainly in the test
+record which level of verification was achieved.
 
 **Debug discipline — restart beats patching.** A broken build is your
 problem, not the user's. After 1–2 targeted patches fail on the same
@@ -540,18 +681,28 @@ After the full-tier game is playable and Production is complete, iterate:
 4. **Exit when all true**: all GDD acceptance criteria verified in the running
    game · latest smoke-check PASS · 3 PASS playtest reports on file (full-system
    coverage + all endings each) · zero open
-   critical/major bugs · 60s continuous browser play with no errors.
+   critical/major bugs · 60s continuous native play with no errors.
 
 **Reviewer independence** — the agent that wrote the code does not accept
 its own quality. Machine-checkable completion (build exits 0, zero console
 errors, tests green) may be self-judged. Quality verdicts — playtest
 assessments, polish adequacy, the final COMPLETE — must come from a reviewer
-who didn't produce the work: spawn a fresh reviewer subagent from the studio
-hierarchy (`qa-lead` for playtest verdicts, `creative-director` for game
-feel, `technical-director` for performance) and hand it the evidence pack
-(screenshots, test records, GDD acceptance criteria) for a written verdict.
-If subagents are unavailable, cold-review: new context, evidence only,
-explicit rubric. The implementer's own "looks good to me" is never evidence.
+who didn't produce the work: spawn the **`playtest-reviewer`** subagent.
+
+**The reviewer produces its own evidence.** Invoke it with a small handoff —
+project root · engine and binary · build entry · the scripted-input seam's name
+and how to enable it · acceptance-criteria paths · round number and output path
+— and nothing else. The method, evidence bar, rubric and report format live in
+`.zcode/agents/playtest-reviewer.md`, which you pass **by reference, never
+restated**. Because the build runs **natively**, the reviewer needs only shell
+access to build, run and capture the game itself, so it must do exactly that and
+base its verdict on what it observed. Your own captures may be passed as context
+but are never sufficient on their own. The reviewer is **read-only on source** —
+it has no Edit tool and writes only its own report.
+
+If subagents are unavailable, cold-review: new context, run the build
+yourself, and follow `.zcode/agents/playtest-reviewer.md` as your method and
+rubric. The implementer's own "looks good to me" is never evidence.
 
 **Stall detection — count, don't vibe.** After each iteration record the
 number of **new findings** (bugs fixed, acceptance criteria newly verified,
@@ -578,84 +729,73 @@ diff in the journal) and pick a different improvement.
 
 A scored, evidence-gated challenge loop that pushes the game to a quality bar
 before Wrap-Up. It is the studio's equivalent of a cross-model jury: an
-independent reviewer subagent scores ONLY what the evidence pack proves, and
+independent reviewer subagent scores ONLY what it can verify by running the build itself, and
 forces fixes until a threshold — the implementer never acquits its own work.
 
 **Gating (`REVIEW_MODE`)**: `solo` skips the loop entirely; `lean` runs it once
 at the Polish step above; `full` runs it per major artifact (per system GDD,
 per sprint, per release gate). When skipped, journal it.
 
-**No round cap in this loop.** `MAX_ROUNDS` does not apply here — the loop
-stops ONLY on the quality gate below or the stale ladder. Rounds are cheap;
-shipping an unverified game is not.
+**No round cap in this loop.** `MAX_ROUNDS = INF` means exactly that: the loop
+stops ONLY on the quality gate below. Rounds are cheap; shipping an unverified
+game is not.
 
-**One reviewer, all dimensions.** Spawn a single fresh-context reviewer
-subagent (e.g. `creative-director` or `qa-lead` — never the agent that wrote the
-code) to score every dimension below and emit 意见 / 建议 / 疑问 / 缺件.
-Scoring from a single rater keeps the dimensions comparable across rounds.
+**One reviewer, all dimensions.** Spawn a single fresh-context
+**`playtest-reviewer`** subagent (never the agent that wrote the code) to score
+every dimension below and emit 意见 / 建议 / 疑问 / 缺件. Scoring from a single
+rater keeps the dimensions comparable across rounds. The reviewer's method,
+evidence bar, rubric anchors and output format live in
+`.zcode/agents/playtest-reviewer.md` — that file is the single source; this skill
+never restates them.
 
 **Mechanism per round**
 
-1. **The main agent builds the evidence pack.** Build the game, launch it, and
-   drive it with `DEBUG_SKILL` (`control-browser`): enter the game, play every
-   MVP system to a real outcome, pause/resume, reach every ending type, capture
-   screenshots, console output, and input→feedback notes. The pack MUST contain:
-   - the three stage logs (`.boot.log` / `.export.log` / `.console.log`,
-     timestamped, from this round's Test Loop run);
-   - screenshots as BEFORE/ACTION/AFTER sequences per item, not single frames:
-     boot (loading → title → first scene), every MVP system (enter → interact
-     → outcome), every ending (approach → trigger → result screen), and
-     pause/resume (gameplay → paused overlay → resumed gameplay). Minimum 3
-     frames per item: a single screenshot proves presence, never motion,
-     feedback, or transition. Static look (界面美观性) may rest on one frame;
-     every dynamic claim MUST have its sequence;
-   - input→feedback notes for the core verb, each note anchored to its
-     sequence (which frames show the feedback).
-   Write the pack to `production/auto-game-in-sleep/test-runs/review-<round>.md`.
-   A pack missing any of the above is NOT sent for review — the round is
-   recorded as FAIL (evidence incomplete) and the next round re-runs the Test
-   Loop first.
-2. **Hand the pack to the reviewer.** Give the subagent: the evidence pack, the
-   GDD acceptance criteria, and the score tables below. The reviewer scores
-   strictly from the pack — never from reading code, never from the main
-   agent's claims. A dynamic claim backed by only one frame = unproven motion:
-   score it as a still, not as gameplay.
-3. **The reviewer scores evidence first, game second.** Completeness of the
-   pack is scored before quality of the game: a normal-looking game with a
-   thin pack scores LOW. Missing ending sequences cap 真实可玩性 at 5;
-   single-frame-only dynamics cap 动态体验 at 5 (motion unproven);
-   missing per-system sequences deduct 完整度 per missing item; missing logs
-   cap 架构与可维护性 at 5 (unverifiable build). Every dimension score carries
-   a one-line reason anchored to the rubric PLUS the evidence path it rests on
-   (screenshot/log path or "no evidence").
-4. **The reviewer also writes the 缺件清单** — exactly what evidence is
-   missing and what to capture next round. The main agent fixes games AND
-   packs: next round re-runs the Test Loop to fill the gaps first, then
-   implements the 建议. Update `state.json`: `iterations`, `stale_count`, and
-   the `adversarial-review` step's `done`/`accepted` + evidence path.
+1. **Hand over a runnable build — not evidence.** Spawn `playtest-reviewer`
+   with the six-field handoff: project root · engine and binary · build entry ·
+   the scripted-input seam's name and how to enable it · acceptance-criteria
+   paths · round number and output path. Your own captures may be passed as
+   optional context, never as the basis of the score. A round whose reviewer
+   never ran the build is recorded as FAIL (evidence not independently
+   produced).
+2. **The reviewer plays it itself and produces the evidence** — its own
+   timestamped logs and its own BEFORE/ACTION/AFTER frame sequences per MVP
+   system, per ending, and for pause/resume. Its full procedure, evidence bar,
+   caps and report format are in `.zcode/agents/playtest-reviewer.md`; hand
+   that file over **by reference** and do not paraphrase it into the prompt.
+3. **Act on what it returns.** It writes its round pack to
+   `production/auto-game-in-sleep/test-runs/review-<round>-by-reviewer.md`
+   (意见 / 建议 / 疑问 / 缺件清单). Fill the 缺件 gaps by re-running the Test
+   Loop FIRST, then implement the 建议. Update `state.json`: `iterations`,
+   `stale_count`, and the `adversarial-review` step's `done`/`accepted` +
+   evidence path.
 
-**Scoring — two parts, six dimensions (each 0–10)**
+**Scoring — six dimensions (each 0–10)**
 
-Part A — design & implementation (static; from GDD + source)
+Anchors, the Part A / Part B split (static: 完整度 / 新颖性 / 架构与可维护性;
+from the reviewer's own run: 真实可玩性 / 界面美观性 / 动态体验) and the
+completeness caps live in `.zcode/agents/playtest-reviewer.md`. This skill owns
+**only the gate**, so the rubric has exactly one copy and cannot drift:
 
-| Dimension | 0 | 5 | 8 | 10 |
-|-----------|---|---|---|----|
-| 完整度 | GDD-promised systems mostly absent | core present, several GDD features missing | all MVP systems in place, minor gaps | full tier implemented per GDD |
-| 新颖性 | cliché clone, no identity | competent but familiar | clear original turn on a known genre | genuinely novel core loop |
-| 架构与可维护性 | spaghetti, no structure | follows basic conventions, some smells | clean, follows `.zcode/rules` | exemplary, easy to extend |
+- **总分 = mean of the six dimension scores.**
+- **Hard gate**: while `真实可玩性 < 9`, the loop MUST NOT stop — a high average
+  that can't prove full playability from evidence is never accepted.
+- **Stop when**: `总分 > SCORE_THRESHOLD` **and** `真实可玩性 ≥ 9`.
+- No round cap (`MAX_ROUNDS = INF`).
 
-Part B — artifact (dynamic; scored **only** from the evidence pack, and capped
-by its completeness — a claim without a backing screenshot/log scores as if
-unproven, no matter how normal the game looks)
+**界面美观性 — the art cap, and the code-drawn escape hatch.** A screen whose
+visible surfaces come only from code, flat fills or primitive shapes cannot
+score above 4 — scored against the **art coverage ratio** (surfaces backed by an
+asset ÷ all visible surfaces). Because the cap is a ratio rather than a list of
+screens, it covers every screen including ones added later, with no new rule
+needed, and "functional but plain" is not a passing look for this run.
 
-| Dimension | 0 | 5 | 8 | 10 | source |
-|-----------|---|---|---|----|--------|
-| 真实可玩性 | can't even enter / crashes on boot | enters but core loop breaks early / softlock | core loop completable to win/lose, minor issues | smooth full playthrough, no blockers | DEBUG_SKILL play |
-| 界面美观性 (static) | broken / unstyled | functional but plain | clean, on-theme | polished, clear, matches art bible | DEBUG_SKILL frame |
-| 动态体验 (feel/feedback) | no feedback, laggy input | basic feedback, ok response | clear timely feedback, satisfying | excellent juice, fluid | DEBUG_SKILL play |
-
-`真实可玩性` and `动态体验` are dynamic (during play); `界面美观性` is the
-static look — the three are orthogonal.
+**A recorded reason is enough.** If the run journal records a stated reason for
+drawing a surface in code, that surface is excluded from the ratio — no reviewer
+adjudication, no second review pass, no appeal. Reasons are recorded **before**
+the round (the reviewer verifies an existing record, never a retroactive
+excuse), and the reviewer reports how many surfaces it excluded, so a run that
+excuses every surface is visible in the morning report instead of being argued
+over inside the loop.
 
 **Aggregate & termination**
 
@@ -671,28 +811,21 @@ static look — the three are orthogonal.
   NOT govern this loop. Only the quality gate above — or genuine impossibility
   (see Wrap-Up) — ends the loop.
 - On stop, record the final scores in the `adversarial-review` step as
-  `accepted` (with the evidence pack path) and carry them into the morning
+  `accepted` (with the reviewer's own pack path) and carry them into the morning
   report's Quality bars section.
 
 **Outputs per round (the reviewer writes)**
 
-- **意见** — per-dimension score + one-line reason + backing evidence path (or
-  "no evidence"); what works, what doesn't.
-- **建议** — concrete, prioritized fixes; each tied to a dimension; mark which
-  are the minimum to clear the threshold.
-- **疑问** — things the reviewer cannot resolve from evidence (e.g. "is X
-  intended or a bug?"). If a 疑问 blocks acceptance, log it to the blocked list
-  / morning report for the human.
-- **缺件清单** — exactly which evidence is missing (screenshots/logs/notes per
-  system or ending) and what the main agent MUST capture next round before any
-  game fix counts.
+意见 / 建议 / 疑问 / 缺件清单 — their required contents are specified in
+`.zcode/agents/playtest-reviewer.md`. If a 疑问 blocks acceptance, log it to the
+blocked list / morning report for the human.
 
 **Reuses (no new machinery)**
 
 - *done≠accepted* — the loop step is `accepted` only with the score + evidence
   pack on file; "I fixed it" is not evidence.
 - *reviewer independence* — fresh subagent, never the implementer; scores from
-  the evidence pack only, never from its own memory or from reading code for
+  its own run only, never from the main agent's claims or from reading code for
   the main agent's benefit.
 
 ## Wrap-Up
@@ -771,3 +904,9 @@ becomes impossible:
 - **Resume after crash/context loss**: state.json (`last_seen`, per-step
   done/accepted) + journal.md + the catalog artifact checks are the truth;
   redo only the current step.
+- **A target is a phone browser**: the Web export must be touch-playable and
+  phone-sized, not merely clean in a desktop browser window. Do not hand-roll
+  touch controls — check the engine reference docs first (Godot 4.7 ships a
+  built-in `VirtualJoystick` node, which is the cheap path). Treat payload size
+  as a real constraint, because a phone downloads it, and verify at a phone
+  viewport with touch: a passing desktop-browser check proves nothing here.
