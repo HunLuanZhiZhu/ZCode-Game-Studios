@@ -1,0 +1,54 @@
+<svg width="1200" height="320" viewBox="0 0 1200 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="320" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#070A12"/>
+    <stop offset=".52" stop-color="#101425"/>
+    <stop offset="1" stop-color="#081315"/>
+  </linearGradient>
+  <linearGradient id="accent" x1="680" y1="80" x2="1100" y2="245" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#7DD3FC"/>
+    <stop offset=".5" stop-color="#C084FC"/>
+    <stop offset="1" stop-color="#86EFAC"/>
+  </linearGradient>
+  <radialGradient id="g1"><stop stop-color="#2563EB" stop-opacity=".22"/><stop offset="1" stop-color="#2563EB" stop-opacity="0"/></radialGradient>
+  <radialGradient id="g2"><stop stop-color="#10B981" stop-opacity=".18"/><stop offset="1" stop-color="#10B981" stop-opacity="0"/></radialGradient>
+  <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+    <path d="M32 0H0V32" stroke="#D7E2EC" stroke-opacity=".05"/>
+  </pattern>
+</defs>
+<rect width="1200" height="320" rx="26" fill="url(#bg)"/>
+<rect width="1200" height="320" rx="26" fill="url(#grid)"/>
+<circle cx="170" cy="50" r="230" fill="url(#g1)"/>
+<circle cx="1060" cy="270" r="250" fill="url(#g2)"/>
+
+<text x="70" y="105" fill="#F8FAFC" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="52" font-weight="760" letter-spacing="-1.5">ZCode Game Studios</text>
+<text x="73" y="148" fill="#CBD5E1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="21">A ZCode-oriented adaptation of Claude Code Game Studios</text>
+<text x="73" y="185" fill="#8FA1B3" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="15">multi-agent game development · workflows · automation · evaluation</text>
+
+<g transform="translate(72 220)">
+  <rect width="118" height="34" rx="17" fill="#7DD3FC" fill-opacity=".08" stroke="#7DD3FC" stroke-opacity=".32"/>
+  <text x="59" y="22" text-anchor="middle" fill="#BAE6FD" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="12.5">49 agents</text>
+  <rect x="130" width="118" height="34" rx="17" fill="#C084FC" fill-opacity=".08" stroke="#C084FC" stroke-opacity=".32"/>
+  <text x="189" y="22" text-anchor="middle" fill="#E9D5FF" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="12.5">74 skills</text>
+  <rect x="260" width="118" height="34" rx="17" fill="#86EFAC" fill-opacity=".08" stroke="#86EFAC" stroke-opacity=".32"/>
+  <text x="319" y="22" text-anchor="middle" fill="#BBF7D0" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="12.5">11 rules</text>
+</g>
+
+<g transform="translate(690 58)">
+  <rect width="430" height="210" rx="20" fill="#0C141D" stroke="#FFFFFF" stroke-opacity=".09"/>
+  <text x="28" y="38" fill="#7DD3FC" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="12.5" font-weight="700">UPSTREAM</text>
+  <text x="28" y="63" fill="#E2E8F0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">Claude Code Game Studios</text>
+
+  <path d="M70 95H350" stroke="url(#accent)" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="70" cy="95" r="6" fill="#7DD3FC"/>
+  <circle cx="210" cy="95" r="6" fill="#C084FC"/>
+  <circle cx="350" cy="95" r="6" fill="#86EFAC"/>
+
+  <text x="70" y="122" text-anchor="middle" fill="#94A3B8" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10.5">adapt</text>
+  <text x="210" y="122" text-anchor="middle" fill="#94A3B8" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10.5">experiment</text>
+  <text x="350" y="122" text-anchor="middle" fill="#94A3B8" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10.5">evaluate</text>
+
+  <text x="28" y="159" fill="#86EFAC" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="12.5" font-weight="700">THIS FORK</text>
+  <text x="28" y="184" fill="#E2E8F0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">ZCode workflows + autonomous game experiments</text>
+</g>
+</svg>
