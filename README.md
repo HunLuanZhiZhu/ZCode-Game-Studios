@@ -14,6 +14,14 @@
 
 </div>
 
+> [!WARNING]
+> **🚧 This repository is no longer actively maintained.** The framework has been
+> rebuilt as a single installable plugin and now lives at
+> **[Game-Studios-Plugin](https://github.com/HunLuanZhiZhu/Game-Studios-Plugin)**
+> (50+ agents, 70+ skills, guarded hooks, rules, docs — host-neutral, works in
+> Claude Code and ZCode). This repo remains as a historical archive and dogfood
+> workspace — please install the plugin there instead of copying this repository.
+
 > [!IMPORTANT]
 > This repository is based on **[Claude Code Game Studios](https://github.com/Donchitos/Claude-Code-Game-Studios)** by its original authors.  
 > The previous project README has been preserved unchanged as **[README.original.md](./README.original.md)**.  

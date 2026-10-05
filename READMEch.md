@@ -14,6 +14,12 @@
 
 </div>
 
+> [!WARNING]
+> **🚧 本仓库已停止积极维护。** 框架已重构为单个可安装插件,迁移至
+> **[Game-Studios-Plugin](https://github.com/HunLuanZhiZhu/Game-Studios-Plugin)**
+> (50+ Agent、70+ 技能、带守卫的 hooks、规则与文档——宿主中立,Claude Code 与 ZCode 均可用)。
+> 本仓库保留为历史档案与实战测试工作区——请安装新插件,不要再复制本仓库。
+
 > [!IMPORTANT]
 > 本仓库基于原项目 **[Claude Code Game Studios](https://github.com/Donchitos/Claude-Code-Game-Studios)**。  
 > 仓库此前使用的项目 README 已经**原样保留**为 **[README.original.md](./README.original.md)**。  
